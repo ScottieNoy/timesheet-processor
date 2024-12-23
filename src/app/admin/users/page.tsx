@@ -1,22 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Dialog } from '@headlessui/react';
+import Link from 'next/link';
+import { Dialog } from '@/components/Dialog';
 
-type User = {
+interface User {
   id: string;
   username: string;
   isAdmin: boolean;
   createdAt: string;
   updatedAt: string;
-};
-
-type FormData = {
-  username: string;
-  password: string;
-  isAdmin: boolean;
-};
+}
 
 export default function UsersPage() {
   const router = useRouter();
@@ -27,51 +22,51 @@ export default function UsersPage() {
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState({
     username: '',
     password: '',
     isAdmin: false,
   });
 
   useEffect(() => {
-    async function checkSession() {
-      try {
-        const response = await fetch('/api/auth/session');
-        if (response.ok) {
-          const data = await response.json();
-          if (!data.user?.isAdmin) {
-            router.push('/');
-            return;
-          }
-          fetchUsers();
-        } else {
+    checkSession();
+    fetchUsers();
+  }, []);
+
+  async function checkSession() {
+    try {
+      const response = await fetch('/api/auth/session');
+      if (response.ok) {
+        const data = await response.json();
+        if (!data.user?.isAdmin) {
           router.push('/');
+          return;
         }
-      } catch (error) {
-        console.error('Failed to fetch session:', error);
+      } else {
         router.push('/');
       }
+    } catch (error) {
+      console.error('Failed to fetch session:', error);
+      router.push('/');
+    } finally {
+      setLoading(false);
     }
+  }
 
-    checkSession();
-  }, [router]);
-
-  const fetchUsers = async () => {
+  async function fetchUsers() {
     try {
       const response = await fetch('/api/users');
       if (response.ok) {
         const data = await response.json();
         setUsers(data);
       } else {
-        setError('Failed to fetch users');
+        throw new Error('Failed to fetch users');
       }
     } catch (error) {
       console.error('Error fetching users:', error);
-      setError('An error occurred while fetching users');
-    } finally {
-      setLoading(false);
+      setError('Failed to fetch users');
     }
-  };
+  }
 
   const handleEdit = (user: User) => {
     setEditingUser(user);
@@ -148,22 +143,23 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-semibold">User Management</h1>
-        <button
-          onClick={() => router.push('/admin/users/new')}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
-        >
-          Add User
-        </button>
-      </div>
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold mb-6">User Management</h1>
 
       {error && (
-        <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           {error}
         </div>
       )}
+
+      <div className="mb-4">
+        <button
+          onClick={() => router.push('/admin/users/new')}
+          className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+        >
+          Add New User
+        </button>
+      </div>
 
       <div className="bg-white shadow overflow-hidden sm:rounded-lg">
         <table className="min-w-full divide-y divide-gray-200">
@@ -186,11 +182,21 @@ export default function UsersPage() {
           <tbody className="bg-white divide-y divide-gray-200">
             {users.map((user) => (
               <tr key={user.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {user.username}
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm font-medium text-gray-900">
+                    {user.username}
+                  </div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {user.isAdmin ? 'Admin' : 'User'}
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span
+                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                      user.isAdmin
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}
+                  >
+                    {user.isAdmin ? 'Admin' : 'User'}
+                  </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {new Date(user.createdAt).toLocaleDateString()}
@@ -216,131 +222,102 @@ export default function UsersPage() {
       </div>
 
       <Dialog
-        open={isDeleteModalOpen}
+        isOpen={isDeleteModalOpen}
         onClose={() => setIsDeleteModalOpen(false)}
-        className="fixed inset-0 z-10 overflow-y-auto"
+        title="Confirm Delete"
+        description={`Are you sure you want to delete user ${userToDelete?.username}? This action cannot be undone.`}
       >
-        <div className="flex items-center justify-center min-h-screen">
-          <Dialog.Backdrop
-            className="fixed inset-0 bg-black bg-opacity-30"
-            aria-hidden="true"
-          />
-
-          <div className="relative bg-white rounded max-w-md mx-auto p-6">
-            <Dialog.Title className="text-lg font-medium mb-4">
-              Confirm Delete
-            </Dialog.Title>
-            <Dialog.Description className="text-sm text-gray-500 mb-4">
-              Are you sure you want to delete user {userToDelete?.username}? This
-              action cannot be undone.
-            </Dialog.Description>
-
-            <div className="mt-4 flex justify-end space-x-3">
-              <button
-                onClick={() => setIsDeleteModalOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
+        <div className="mt-4 flex justify-end space-x-3">
+          <button
+            onClick={() => setIsDeleteModalOpen(false)}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={confirmDelete}
+            className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+          >
+            Delete
+          </button>
         </div>
       </Dialog>
 
       <Dialog
-        open={isEditModalOpen}
+        isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
-        className="fixed inset-0 z-10 overflow-y-auto"
+        title="Edit User"
       >
-        <div className="flex items-center justify-center min-h-screen">
-          <Dialog.Backdrop
-            className="fixed inset-0 bg-black bg-opacity-30"
-            aria-hidden="true"
-          />
-
-          <div className="relative bg-white rounded max-w-md mx-auto p-6">
-            <Dialog.Title className="text-lg font-medium mb-4">
-              Edit User
-            </Dialog.Title>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label
-                  htmlFor="username"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Username
-                </label>
-                <input
-                  type="text"
-                  id="username"
-                  value={formData.username}
-                  onChange={(e) =>
-                    setFormData({ ...formData, username: e.target.value })
-                  }
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  required
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="password"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Password (leave blank to keep current)
-                </label>
-                <input
-                  type="password"
-                  id="password"
-                  value={formData.password}
-                  onChange={(e) =>
-                    setFormData({ ...formData, password: e.target.value })
-                  }
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={formData.isAdmin}
-                    onChange={(e) =>
-                      setFormData({ ...formData, isAdmin: e.target.checked })
-                    }
-                    className="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                  />
-                  <span className="ml-2 text-sm text-gray-600">
-                    Administrator
-                  </span>
-                </label>
-              </div>
-
-              <div className="mt-4 flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
-                >
-                  Save Changes
-                </button>
-              </div>
-            </form>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label
+              htmlFor="username"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Username
+            </label>
+            <input
+              type="text"
+              id="username"
+              value={formData.username}
+              onChange={(e) =>
+                setFormData({ ...formData, username: e.target.value })
+              }
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              required
+            />
           </div>
-        </div>
+
+          <div>
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Password (leave blank to keep current)
+            </label>
+            <input
+              type="password"
+              id="password"
+              value={formData.password}
+              onChange={(e) =>
+                setFormData({ ...formData, password: e.target.value })
+              }
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={formData.isAdmin}
+                onChange={(e) =>
+                  setFormData({ ...formData, isAdmin: e.target.checked })
+                }
+                className="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              />
+              <span className="ml-2 text-sm text-gray-600">
+                Administrator
+              </span>
+            </label>
+          </div>
+
+          <div className="mt-4 flex justify-end space-x-3">
+            <button
+              type="button"
+              onClick={() => setIsEditModalOpen(false)}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
+            >
+              Save Changes
+            </button>
+          </div>
+        </form>
       </Dialog>
     </div>
   );
