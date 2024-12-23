@@ -9,6 +9,7 @@ type User = {
   username: string;
   isAdmin: boolean;
   createdAt: string;
+  updatedAt: string;
 };
 
 type FormData = {
@@ -22,8 +23,10 @@ export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [isOpen, setIsOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
   const [formData, setFormData] = useState<FormData>({
     username: '',
     password: '',
@@ -70,69 +73,74 @@ export default function UsersPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedUser) return;
-
-    try {
-      const response = await fetch('/api/users', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          id: selectedUser.id,
-          ...formData,
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to update user');
-      }
-
-      await fetchUsers();
-      setIsOpen(false);
-    } catch (error) {
-      console.error('Error updating user:', error);
-      setError(error instanceof Error ? error.message : 'Failed to update user');
-    }
-  };
-
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user?')) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/users`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ id: userId }),
-      });
-
-      if (response.ok) {
-        await fetchUsers();
-      } else {
-        const data = await response.json();
-        setError(data.message || 'Failed to delete user');
-      }
-    } catch (error) {
-      console.error('Error deleting user:', error);
-      setError('An error occurred while deleting the user');
-    }
-  };
-
-  const handleEditUser = (user: User) => {
-    setSelectedUser(user);
+  const handleEdit = (user: User) => {
+    setEditingUser(user);
     setFormData({
       username: user.username,
       password: '',
       isAdmin: user.isAdmin,
     });
-    setIsOpen(true);
+    setIsEditModalOpen(true);
+  };
+
+  const handleDelete = (user: User) => {
+    setUserToDelete(user);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!userToDelete) return;
+
+    try {
+      const response = await fetch(`/api/users/${userToDelete.id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        setUsers(users.filter((user) => user.id !== userToDelete.id));
+        setIsDeleteModalOpen(false);
+        setUserToDelete(null);
+      } else {
+        throw new Error('Failed to delete user');
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      setError('Failed to delete user');
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+
+    try {
+      const response = await fetch(`/api/users/${editingUser.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...formData,
+          id: editingUser.id,
+        }),
+      });
+
+      if (response.ok) {
+        const updatedUser = await response.json();
+        setUsers(
+          users.map((user) =>
+            user.id === updatedUser.id ? updatedUser : user
+          )
+        );
+        setIsEditModalOpen(false);
+        setEditingUser(null);
+      } else {
+        throw new Error('Failed to update user');
+      }
+    } catch (error) {
+      console.error('Error updating user:', error);
+      setError('Failed to update user');
+    }
   };
 
   if (loading) {
@@ -189,13 +197,13 @@ export default function UsersPage() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button
-                    onClick={() => handleEditUser(user)}
+                    onClick={() => handleEdit(user)}
                     className="text-indigo-600 hover:text-indigo-900 mr-4"
                   >
                     Edit
                   </button>
                   <button
-                    onClick={() => handleDeleteUser(user.id)}
+                    onClick={() => handleDelete(user)}
                     className="text-red-600 hover:text-red-900"
                   >
                     Delete
@@ -208,84 +216,124 @@ export default function UsersPage() {
       </div>
 
       <Dialog
-        open={isOpen}
-        onClose={() => setIsOpen(false)}
+        open={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
         className="fixed inset-0 z-10 overflow-y-auto"
       >
         <div className="flex items-center justify-center min-h-screen">
-          <Dialog.Overlay className="fixed inset-0 bg-black opacity-30" />
+          <Dialog.Backdrop
+            className="fixed inset-0 bg-black bg-opacity-30"
+            aria-hidden="true"
+          />
+
+          <div className="relative bg-white rounded max-w-md mx-auto p-6">
+            <Dialog.Title className="text-lg font-medium mb-4">
+              Confirm Delete
+            </Dialog.Title>
+            <Dialog.Description className="text-sm text-gray-500 mb-4">
+              Are you sure you want to delete user {userToDelete?.username}? This
+              action cannot be undone.
+            </Dialog.Description>
+
+            <div className="mt-4 flex justify-end space-x-3">
+              <button
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      </Dialog>
+
+      <Dialog
+        open={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        className="fixed inset-0 z-10 overflow-y-auto"
+      >
+        <div className="flex items-center justify-center min-h-screen">
+          <Dialog.Backdrop
+            className="fixed inset-0 bg-black bg-opacity-30"
+            aria-hidden="true"
+          />
 
           <div className="relative bg-white rounded max-w-md mx-auto p-6">
             <Dialog.Title className="text-lg font-medium mb-4">
               Edit User
             </Dialog.Title>
 
-            <form onSubmit={handleSubmit}>
-              <div className="space-y-4">
-                <div>
-                  <label
-                    htmlFor="username"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    Username
-                  </label>
-                  <input
-                    type="text"
-                    id="username"
-                    value={formData.username}
-                    onChange={(e) =>
-                      setFormData({ ...formData, username: e.target.value })
-                    }
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="password"
-                    className="block text-sm font-medium text-gray-700"
-                  >
-                    New Password (leave blank to keep current)
-                  </label>
-                  <input
-                    type="password"
-                    id="password"
-                    value={formData.password}
-                    onChange={(e) =>
-                      setFormData({ ...formData, password: e.target.value })
-                    }
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={formData.isAdmin}
-                      onChange={(e) =>
-                        setFormData({ ...formData, isAdmin: e.target.checked })
-                      }
-                      className="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                    />
-                    <span className="ml-2 text-sm text-gray-600">
-                      Administrator
-                    </span>
-                  </label>
-                </div>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label
+                  htmlFor="username"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Username
+                </label>
+                <input
+                  type="text"
+                  id="username"
+                  value={formData.username}
+                  onChange={(e) =>
+                    setFormData({ ...formData, username: e.target.value })
+                  }
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  required
+                />
               </div>
 
-              <div className="mt-6 flex justify-end space-x-3">
+              <div>
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-medium text-gray-700"
+                >
+                  Password (leave blank to keep current)
+                </label>
+                <input
+                  type="password"
+                  id="password"
+                  value={formData.password}
+                  onChange={(e) =>
+                    setFormData({ ...formData, password: e.target.value })
+                  }
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={formData.isAdmin}
+                    onChange={(e) =>
+                      setFormData({ ...formData, isAdmin: e.target.checked })
+                    }
+                    className="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-600">
+                    Administrator
+                  </span>
+                </label>
+              </div>
+
+              <div className="mt-4 flex justify-end space-x-3">
                 <button
                   type="button"
-                  onClick={() => setIsOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
                 >
                   Save Changes
                 </button>
