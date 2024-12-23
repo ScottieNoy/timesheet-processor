@@ -3,7 +3,7 @@ compatibility_date = "2023-12-23"
 
 [build]
 command = "npm run build"
-publish = ".next"
+publish = "out"
 
 [[d1_databases]]
 binding = "DB"
