@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
 import { processTimesheet } from '@/lib/timesheet';
 import { prisma } from '@/lib/prisma';
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   const session = await getSession();
 
   if (!session) {
@@ -14,20 +14,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const formData = await request.formData();
-    const file = formData.get('file') as File | null;
+    const file = formData.get('file') as File;
 
     if (!file) {
       return new NextResponse(JSON.stringify({ error: 'No file provided' }), {
         status: 400,
       });
-    }
-
-    // Check file type
-    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
-      return NextResponse.json(
-        { error: 'Invalid file type. Please upload an Excel file (.xlsx or .xls)' },
-        { status: 400 }
-      );
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
@@ -36,13 +28,16 @@ export async function POST(request: NextRequest) {
     // Save the processed file information
     await prisma.processedFile.create({
       data: {
-        originalName: file.name,
-        processedName: `processed_${file.name}`,
         userId: session.user.id,
+        filename: file.name,
       },
     });
 
-    return NextResponse.json(result);
+    return NextResponse.json({
+      success: true,
+      data: result,
+      message: 'File processed successfully',
+    });
   } catch (error) {
     console.error('Error processing timesheet:', error);
     return new NextResponse(
