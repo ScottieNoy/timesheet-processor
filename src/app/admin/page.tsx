@@ -1,142 +1,70 @@
 'use client';
 
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
-interface User {
-  id: string;
+type User = {
   username: string;
   isAdmin: boolean;
-  createdAt: string;
-}
+};
 
 export default function AdminPage() {
-  const { data: session } = useSession();
   const router = useRouter();
-  const [users, setUsers] = useState<User[]>([]);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   useEffect(() => {
-    const fetchUsers = async () => {
+    async function checkSession() {
       try {
-        const response = await fetch('/api/users');
+        const response = await fetch('/api/auth/session');
         if (response.ok) {
           const data = await response.json();
-          setUsers(data);
-        } else {
-          setError('Failed to fetch users');
+          if (!data.user?.isAdmin) {
+            router.push('/');
+            return;
+          }
+          setUser(data.user);
         }
       } catch (error) {
-        console.error('Error fetching users:', error);
-        setError('An error occurred while fetching users');
+        console.error('Failed to fetch session:', error);
+        router.push('/');
       } finally {
         setLoading(false);
       }
-    };
-
-    fetchUsers();
-  }, []);
-
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user?')) {
-      return;
     }
 
-    try {
-      const response = await fetch(`/api/users/${userId}`, {
-        method: 'DELETE',
-      });
+    checkSession();
+  }, [router]);
 
-      if (response.ok) {
-        setUsers(users.filter((user) => user.id !== userId));
-      } else {
-        const data = await response.json();
-        setError(data.message || 'Failed to delete user');
-      }
-    } catch (error) {
-      console.error('Error deleting user:', error);
-      setError('An error occurred while deleting the user');
-    }
-  };
+  if (loading) {
+    return <div>Loading...</div>;
+  }
 
-  if (!session?.user.isAdmin) {
-    router.push('/');
+  if (!user?.isAdmin) {
     return null;
   }
 
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-semibold">User Management</h1>
-        <button
-          onClick={() => router.push('/admin/users/new')}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
-        >
-          Add User
-        </button>
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold mb-4">Admin Dashboard</h1>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white shadow rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">User Management</h2>
+          <p className="text-gray-600 mb-4">
+            Manage user accounts and permissions
+          </p>
+          <button
+            onClick={() => router.push('/admin/users')}
+            className="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded"
+          >
+            Manage Users
+          </button>
+        </div>
+        <div className="bg-white shadow rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">System Settings</h2>
+          <p className="text-gray-600">Configure system preferences</p>
+        </div>
       </div>
-
-      {error && (
-        <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
-        </div>
-      )}
-
-      {loading ? (
-        <div>Loading...</div>
-      ) : (
-        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Username
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Role
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Created At
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {users.map((user) => (
-                <tr key={user.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {user.username}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {user.isAdmin ? 'Admin' : 'User'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(user.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button
-                      onClick={() => router.push(`/admin/users/${user.id}`)}
-                      className="text-indigo-600 hover:text-indigo-900 mr-4"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDeleteUser(user.id)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </div>
   );
 }
