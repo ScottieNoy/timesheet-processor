@@ -3,7 +3,7 @@ compatibility_date = "2023-12-23"
 
 [build]
 command = "npm run build"
-publish = "out"
+pages_build_output_dir = "out"
 
 [[d1_databases]]
 binding = "DB"
@@ -14,4 +14,4 @@ database_id = "77c632f9-fb38-4240-8217-00395bd5ca87"
 NODE_VERSION = "18"
 
 [env.production]
-NEXTAUTH_URL = "https://your-domain.pages.dev"
+NEXTAUTH_URL = "https://timesheet-processor.pages.dev"
