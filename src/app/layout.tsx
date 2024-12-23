@@ -1,3 +1,5 @@
+'use client';
+
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
@@ -19,7 +21,9 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <Navigation />
-        {children}
+        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+          {children}
+        </main>
       </body>
     </html>
   );

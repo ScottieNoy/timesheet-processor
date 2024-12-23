@@ -1,5 +1,3 @@
-export { default as Navigation } from './Navigation';
-
 'use client';
 
 import Link from 'next/link';
@@ -11,7 +9,7 @@ type User = {
   isAdmin: boolean;
 };
 
-function Navigation() {
+export function Navigation() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -106,5 +104,3 @@ function Navigation() {
     </nav>
   );
 }
-
-export default Navigation;
