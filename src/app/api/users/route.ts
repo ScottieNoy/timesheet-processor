@@ -49,22 +49,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if username is already taken
     const existingUser = await prisma.user.findUnique({
-      where: {
-        username,
-      },
+      where: { username },
     });
 
     if (existingUser) {
       return NextResponse.json(
-        { message: 'Username is already taken' },
+        { message: 'Username already exists' },
         { status: 400 }
       );
     }
 
     const hashedPassword = await hash(password, 10);
-
     const user = await prisma.user.create({
       data: {
         username,
@@ -82,6 +78,73 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(user);
   } catch (error) {
     console.error('Error creating user:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user.isAdmin) {
+    return new NextResponse('Unauthorized', { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    const { id, username, password, isAdmin } = body;
+
+    if (!id || !username) {
+      return NextResponse.json(
+        { message: 'User ID and username are required' },
+        { status: 400 }
+      );
+    }
+
+    const existingUser = await prisma.user.findUnique({
+      where: { id },
+    });
+
+    if (!existingUser) {
+      return NextResponse.json(
+        { message: 'User not found' },
+        { status: 404 }
+      );
+    }
+
+    const userWithSameUsername = await prisma.user.findUnique({
+      where: { username },
+    });
+
+    if (userWithSameUsername && userWithSameUsername.id !== id) {
+      return NextResponse.json(
+        { message: 'Username already exists' },
+        { status: 400 }
+      );
+    }
+
+    const updateData: any = {
+      username,
+      isAdmin: isAdmin || false,
+    };
+
+    if (password) {
+      updateData.password = await hash(password, 10);
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: updateData,
+      select: {
+        id: true,
+        username: true,
+        isAdmin: true,
+        createdAt: true,
+      },
+    });
+
+    return NextResponse.json(updatedUser);
+  } catch (error) {
+    console.error('Error updating user:', error);
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 }

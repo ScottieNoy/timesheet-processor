@@ -62,20 +62,27 @@ export default function UsersPage() {
     if (!selectedUser) return;
 
     try {
-      const response = await fetch(`/api/users/${selectedUser.id}`, {
+      const response = await fetch('/api/users', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          id: selectedUser.id,
+          ...formData
+        }),
       });
 
-      if (!response.ok) throw new Error('Failed to update user');
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.message || 'Failed to update user');
+      }
 
       await fetchUsers();
       setIsOpen(false);
     } catch (error) {
       console.error('Error updating user:', error);
+      alert(error instanceof Error ? error.message : 'Failed to update user');
     }
   };
 
