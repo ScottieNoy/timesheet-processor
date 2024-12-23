@@ -1,75 +1,79 @@
-import { NextAuthOptions } from "next-auth";
-import CredentialsProvider from "next-auth/providers/credentials";
-import { prisma } from "./prisma";
 import { compare } from "bcrypt";
+import { prisma } from "./prisma";
+import { cookies } from "next/headers";
+import { SignJWT, jwtVerify } from "jose";
 
-export const authOptions: NextAuthOptions = {
-  session: {
-    strategy: "jwt",
-  },
-  pages: {
-    signIn: "/login",
-  },
-  secret: process.env.NEXTAUTH_SECRET,
-  providers: [
-    CredentialsProvider({
-      name: "Credentials",
-      credentials: {
-        username: { label: "Username", type: "text" },
-        password: { label: "Password", type: "password" },
+const secretKey = new TextEncoder().encode(
+  process.env.NEXTAUTH_SECRET || "default-secret-key"
+);
+
+export async function signIn(username: string, password: string) {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { username },
+    });
+
+    if (!user) {
+      return { error: "Invalid credentials" };
+    }
+
+    const isPasswordValid = await compare(password, user.password);
+
+    if (!isPasswordValid) {
+      return { error: "Invalid credentials" };
+    }
+
+    // Create the session token
+    const token = await new SignJWT({
+      id: user.id,
+      username: user.username,
+      isAdmin: user.isAdmin,
+    })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuedAt()
+      .setExpirationTime("24h")
+      .sign(secretKey);
+
+    // Set the session cookie
+    cookies().set("session-token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24, // 24 hours
+    });
+
+    return {
+      user: {
+        id: user.id,
+        username: user.username,
+        isAdmin: user.isAdmin,
       },
-      async authorize(credentials) {
-        if (!credentials?.username || !credentials?.password) {
-          return null;
-        }
+    };
+  } catch (error) {
+    console.error("Sign in error:", error);
+    return { error: "An error occurred during sign in" };
+  }
+}
 
-        const user = await prisma.user.findUnique({
-          where: {
-            username: credentials.username,
-          },
-        });
+export async function signOut() {
+  cookies().delete("session-token");
+}
 
-        if (!user) {
-          return null;
-        }
+export async function getSession() {
+  try {
+    const token = cookies().get("session-token")?.value;
 
-        const isPasswordValid = await compare(
-          credentials.password,
-          user.password
-        );
+    if (!token) {
+      return null;
+    }
 
-        if (!isPasswordValid) {
-          return null;
-        }
-
-        return {
-          id: user.id,
-          username: user.username,
-          isAdmin: user.isAdmin,
-        };
-      },
-    }),
-  ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        return {
-          ...token,
-          username: user.username,
-          isAdmin: user.isAdmin,
-        };
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      return {
-        ...session,
-        user: {
-          ...session.user,
-          username: token.username,
-          isAdmin: token.isAdmin,
-        },
-      };
-    },
-  },
-};
+    const verified = await jwtVerify(token, secretKey);
+    return verified.payload as {
+      id: string;
+      username: string;
+      isAdmin: boolean;
+    };
+  } catch (error) {
+    return null;
+  }
+}

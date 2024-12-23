@@ -1,6 +1,5 @@
 'use client';
 
-import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
@@ -19,16 +18,18 @@ export default function LoginPage() {
     const password = formData.get('password') as string;
 
     try {
-      console.log('Attempting login with:', { username });
-      const result = await signIn('credentials', {
-        username,
-        password,
-        redirect: false,
+      const response = await fetch('/api/auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
       });
-      console.log('Login result:', result);
 
-      if (result?.error) {
-        setError(`Authentication failed: ${result.error}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Authentication failed');
       } else {
         router.push('/');
         router.refresh();
@@ -80,8 +81,8 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded">
-              {error}
+            <div className="rounded-md bg-red-50 p-4">
+              <div className="text-sm text-red-700">{error}</div>
             </div>
           )}
 
@@ -89,7 +90,11 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+              className={`group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white ${
+                loading
+                  ? 'bg-indigo-400 cursor-not-allowed'
+                  : 'bg-indigo-600 hover:bg-indigo-700'
+              } focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
             >
               {loading ? 'Signing in...' : 'Sign in'}
             </button>
