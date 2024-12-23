@@ -1,25 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as XLSX from 'xlsx';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { getSession } from '@/lib/auth';
+import { processTimesheet } from '@/lib/timesheet';
 import { prisma } from '@/lib/prisma';
 
 export async function POST(request: NextRequest) {
+  const session = await getSession();
+
+  if (!session) {
+    return new NextResponse(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+    });
+  }
+
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
-    }
-
     const formData = await request.formData();
     const file = formData.get('file') as File | null;
 
     if (!file) {
-      return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
+      return new NextResponse(JSON.stringify({ error: 'No file provided' }), {
+        status: 400,
+      });
     }
 
     // Check file type
@@ -30,16 +30,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Convert file to buffer
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    // Read the workbook
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-
-    // Process the worksheet
-    // Add your processing logic here
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const result = await processTimesheet(buffer);
 
     // Save the processed file information
     await prisma.processedFile.create({
@@ -50,16 +42,11 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Return success response
-    return NextResponse.json({ 
-      success: true,
-      message: 'File processed successfully',
-      filename: `processed_${file.name}`
-    });
+    return NextResponse.json(result);
   } catch (error) {
-    console.error('Error processing file:', error);
-    return NextResponse.json(
-      { error: 'Error processing file' },
+    console.error('Error processing timesheet:', error);
+    return new NextResponse(
+      JSON.stringify({ error: 'Error processing timesheet' }),
       { status: 500 }
     );
   }

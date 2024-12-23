@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { hash } from 'bcrypt';
 
@@ -8,32 +7,39 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const session = await getServerSession(authOptions);
+  const session = await getSession();
 
-  if (!session?.user.isAdmin) {
-    return new NextResponse('Unauthorized', { status: 401 });
+  if (!session?.user?.isAdmin) {
+    return new NextResponse(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+    });
   }
 
   try {
     const user = await prisma.user.findUnique({
-      where: {
-        id: params.id,
-      },
+      where: { id: params.id },
       select: {
         id: true,
         username: true,
         isAdmin: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
 
     if (!user) {
-      return new NextResponse('User not found', { status: 404 });
+      return new NextResponse(JSON.stringify({ error: 'User not found' }), {
+        status: 404,
+      });
     }
 
     return NextResponse.json(user);
   } catch (error) {
     console.error('Error fetching user:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    return new NextResponse(
+      JSON.stringify({ error: 'Error fetching user' }),
+      { status: 500 }
+    );
   }
 }
 
@@ -41,10 +47,12 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const session = await getServerSession(authOptions);
+  const session = await getSession();
 
-  if (!session?.user.isAdmin) {
-    return new NextResponse('Unauthorized', { status: 401 });
+  if (!session?.user?.isAdmin) {
+    return new NextResponse(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+    });
   }
 
   try {
@@ -93,7 +101,10 @@ export async function PUT(
     return NextResponse.json(user);
   } catch (error) {
     console.error('Error updating user:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    return new NextResponse(
+      JSON.stringify({ error: 'Error updating user' }),
+      { status: 500 }
+    );
   }
 }
 
@@ -101,22 +112,25 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const session = await getServerSession(authOptions);
+  const session = await getSession();
 
-  if (!session?.user.isAdmin) {
-    return new NextResponse('Unauthorized', { status: 401 });
+  if (!session?.user?.isAdmin) {
+    return new NextResponse(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+    });
   }
 
   try {
-    await prisma.user.delete({
-      where: {
-        id: params.id,
-      },
+    const user = await prisma.user.delete({
+      where: { id: params.id },
     });
 
-    return new NextResponse(null, { status: 204 });
+    return NextResponse.json(user);
   } catch (error) {
     console.error('Error deleting user:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    return new NextResponse(
+      JSON.stringify({ error: 'Error deleting user' }),
+      { status: 500 }
+    );
   }
 }

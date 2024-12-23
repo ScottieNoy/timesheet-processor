@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { hash } from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await getSession();
 
-  if (!session?.user.isAdmin) {
-    return new NextResponse('Unauthorized', { status: 401 });
+  if (!session?.user?.isAdmin) {
+    return new NextResponse(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+    });
   }
 
   try {
@@ -18,6 +19,7 @@ export async function GET(request: NextRequest) {
         username: true,
         isAdmin: true,
         createdAt: true,
+        updatedAt: true,
       },
       orderBy: {
         createdAt: 'desc',
@@ -27,15 +29,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(users);
   } catch (error) {
     console.error('Error fetching users:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    return new NextResponse(
+      JSON.stringify({ error: 'Error fetching users' }),
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await getSession();
 
-  if (!session?.user.isAdmin) {
-    return new NextResponse('Unauthorized', { status: 401 });
+  if (!session?.user?.isAdmin) {
+    return new NextResponse(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+    });
   }
 
   try {
@@ -43,8 +50,8 @@ export async function POST(request: NextRequest) {
     const { username, password, isAdmin } = body;
 
     if (!username || !password) {
-      return NextResponse.json(
-        { message: 'Username and password are required' },
+      return new NextResponse(
+        JSON.stringify({ error: 'Username and password are required' }),
         { status: 400 }
       );
     }
@@ -54,13 +61,13 @@ export async function POST(request: NextRequest) {
     });
 
     if (existingUser) {
-      return NextResponse.json(
-        { message: 'Username already exists' },
+      return new NextResponse(
+        JSON.stringify({ error: 'Username already exists' }),
         { status: 400 }
       );
     }
 
-    const hashedPassword = await hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
       data: {
         username,
@@ -72,21 +79,27 @@ export async function POST(request: NextRequest) {
         username: true,
         isAdmin: true,
         createdAt: true,
+        updatedAt: true,
       },
     });
 
     return NextResponse.json(user);
   } catch (error) {
     console.error('Error creating user:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    return new NextResponse(
+      JSON.stringify({ error: 'Error creating user' }),
+      { status: 500 }
+    );
   }
 }
 
 export async function PUT(request: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await getSession();
 
-  if (!session?.user.isAdmin) {
-    return new NextResponse('Unauthorized', { status: 401 });
+  if (!session?.user?.isAdmin) {
+    return new NextResponse(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+    });
   }
 
   try {
@@ -94,8 +107,8 @@ export async function PUT(request: NextRequest) {
     const { id, username, password, isAdmin } = body;
 
     if (!id || !username) {
-      return NextResponse.json(
-        { message: 'User ID and username are required' },
+      return new NextResponse(
+        JSON.stringify({ error: 'User ID and username are required' }),
         { status: 400 }
       );
     }
@@ -105,8 +118,8 @@ export async function PUT(request: NextRequest) {
     });
 
     if (!existingUser) {
-      return NextResponse.json(
-        { message: 'User not found' },
+      return new NextResponse(
+        JSON.stringify({ error: 'User not found' }),
         { status: 404 }
       );
     }
@@ -116,8 +129,8 @@ export async function PUT(request: NextRequest) {
     });
 
     if (userWithSameUsername && userWithSameUsername.id !== id) {
-      return NextResponse.json(
-        { message: 'Username already exists' },
+      return new NextResponse(
+        JSON.stringify({ error: 'Username already exists' }),
         { status: 400 }
       );
     }
@@ -128,7 +141,7 @@ export async function PUT(request: NextRequest) {
     };
 
     if (password) {
-      updateData.password = await hash(password, 10);
+      updateData.password = await bcrypt.hash(password, 10);
     }
 
     const updatedUser = await prisma.user.update({
@@ -139,12 +152,16 @@ export async function PUT(request: NextRequest) {
         username: true,
         isAdmin: true,
         createdAt: true,
+        updatedAt: true,
       },
     });
 
     return NextResponse.json(updatedUser);
   } catch (error) {
     console.error('Error updating user:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    return new NextResponse(
+      JSON.stringify({ error: 'Error updating user' }),
+      { status: 500 }
+    );
   }
 }
