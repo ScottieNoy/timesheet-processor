@@ -1,0 +1,9 @@
+[build]
+command = "npm run build"
+publish = ".next/standalone"
+
+[build.environment]
+NODE_VERSION = "18"
+
+[env.production]
+NEXTAUTH_URL = "https://your-domain.pages.dev"
