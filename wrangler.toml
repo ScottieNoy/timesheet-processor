@@ -1,6 +1,14 @@
+name = "timesheet-processor"
+compatibility_date = "2023-12-23"
+
 [build]
 command = "npm run build"
-publish = ".next/standalone"
+publish = ".next"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "timesheet-processor"
+database_id = "77c632f9-fb38-4240-8217-00395bd5ca87"
 
 [build.environment]
 NODE_VERSION = "18"
