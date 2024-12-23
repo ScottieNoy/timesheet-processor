@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processTimesheet } from '@/lib/excel';
 
+export const runtime = 'edge';
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -19,7 +21,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Convert file to buffer
-    const buffer = Buffer.from(await file.arrayBuffer());
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
 
     // Process the timesheet
     const processedBuffer = await processTimesheet(buffer);
@@ -27,8 +30,8 @@ export async function POST(request: NextRequest) {
     // Return the processed file
     return new NextResponse(processedBuffer, {
       headers: {
-        'Content-Disposition': `attachment; filename="processed_timesheet.xlsx"`,
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="processed_${file.name}"`,
       },
     });
   } catch (error) {
@@ -39,9 +42,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
