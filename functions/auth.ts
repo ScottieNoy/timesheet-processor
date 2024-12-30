@@ -26,6 +26,11 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
     let users: User[] = JSON.parse(usersStr);
     const adminPassword = context.env.ADMIN_PASSWORD || 'admin-password';
 
+    // Debug logging
+    console.log('Action:', request.action);
+    console.log('Is first time setup:', request.isFirstTimeSetup);
+    console.log('Admin password exists:', !!context.env.ADMIN_PASSWORD);
+    
     switch (request.action) {
       case 'login':
         if (!request.username || !request.password) {
@@ -59,8 +64,21 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
             });
           }
 
+          // Debug logging
+          console.log('Setup password check:', {
+            provided: request.adminPassword,
+            expected: adminPassword,
+            matches: request.adminPassword === adminPassword
+          });
+
           if (!request.adminPassword || request.adminPassword !== adminPassword) {
-            return new Response(JSON.stringify({ error: 'Invalid setup password' }), {
+            return new Response(JSON.stringify({ 
+              error: 'Invalid setup password',
+              debug: {
+                hasAdminPassword: !!context.env.ADMIN_PASSWORD,
+                providedPassword: !!request.adminPassword
+              }
+            }), {
               status: 401,
               headers: { 'Content-Type': 'application/json' },
             });
