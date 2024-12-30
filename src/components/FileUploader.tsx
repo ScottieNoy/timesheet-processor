@@ -32,7 +32,7 @@ export function FileUploader({ isProcessing, setIsProcessing, setError }: FileUp
       setIsProcessing(true);
       setError(null);
       
-      const response = await fetch('/api/process', {
+      const response = await fetch('/process', {
         method: 'POST',
         body: formData,
       });
