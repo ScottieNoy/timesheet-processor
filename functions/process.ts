@@ -1,11 +1,12 @@
-import { RequestEvent } from '@cloudflare/workers-types';
 import * as XLSX from 'xlsx';
 
-interface Env {}
+export interface Env {
+  // Add your environment variables here
+}
 
-export const onRequestPost = async ({ request }: RequestEvent<Env>) => {
+export const onRequestPost = async (context: { request: Request }) => {
   try {
-    const formData = await request.formData();
+    const formData = await context.request.formData();
     const file = formData.get('file') as File;
     
     if (!file) {
