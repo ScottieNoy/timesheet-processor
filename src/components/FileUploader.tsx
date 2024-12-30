@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useCallback, useRef } from 'react';
 
 interface FileUploaderProps {
@@ -6,7 +8,7 @@ interface FileUploaderProps {
   setError: (error: string | null) => void;
 }
 
-export function FileUploader({ isProcessing, setIsProcessing, setError }: FileUploaderProps) {
+const FileUploader = ({ isProcessing, setIsProcessing, setError }: FileUploaderProps) => {
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -121,4 +123,6 @@ export function FileUploader({ isProcessing, setIsProcessing, setError }: FileUp
       </label>
     </div>
   );
-}
+};
+
+export default FileUploader;

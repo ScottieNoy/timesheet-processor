@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import FileUploader from '../components/FileUploader';
-import AuthCheck from '../components/AuthCheck';
+import FileUploader from '@/components/FileUploader';
+import AuthCheck from '@/components/AuthCheck';
 
 export default function Home() {
   const [isProcessing, setIsProcessing] = useState(false);
