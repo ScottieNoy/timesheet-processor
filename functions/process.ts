@@ -37,7 +37,7 @@ export const onRequestPost = async (context: { request: Request }) => {
       row['Last Name'],
       row['Total Hours'],
       row['Adjusted Additional Hours'],
-      { v: row['Final Adjusted Total Hours'], s: { fill: { fgColor: { rgb: "90EE90" }, patternType: "solid" } } }
+      row['Final Adjusted Total Hours']
     ]);
 
     // Create worksheet
@@ -47,6 +47,22 @@ export const onRequestPost = async (context: { request: Request }) => {
     const colWidths = [15, 15, 12, 20, 22];
     ws['!cols'] = colWidths.map(width => ({ width }));
 
+    // Apply green fill to the "Final Adjusted Total Hours" column
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:E1');
+    for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+      const cellRef = XLSX.utils.encode_cell({ r: R, c: 4 }); // Column E (index 4)
+      const cell = ws[cellRef];
+      if (cell) {
+        cell.s = {
+          fill: {
+            patternType: 'solid',
+            fgColor: { rgb: '92D050' }, // Excel's standard light green
+            bgColor: { rgb: '92D050' }
+          }
+        };
+      }
+    }
+
     // Add the worksheet to workbook
     XLSX.utils.book_append_sheet(wb, ws, 'Processed Timesheet');
 
@@ -54,7 +70,8 @@ export const onRequestPost = async (context: { request: Request }) => {
     const wbout = XLSX.write(wb, {
       bookType: 'xlsx' as const,
       type: 'array' as const,
-      cellStyles: true
+      cellStyles: true,
+      compression: true
     });
 
     return new Response(wbout, {
