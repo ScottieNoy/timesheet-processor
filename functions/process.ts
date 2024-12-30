@@ -27,41 +27,43 @@ export const onRequestPost = async (context: { request: Request }) => {
     // Process the data
     const processedData = processTimesheet(timesheet);
 
-    // Create a new workbook with styling
+    // Create a new workbook
     const wb = XLSX.utils.book_new();
     
-    // Convert data to array format
+    // Prepare the data with styling
+    const greenStyle = {
+      fill: {
+        patternType: 'solid',
+        fgColor: { rgb: '92D050' }
+      }
+    };
+
+    // Convert data to array format with styled cells
     const headers = ['First Name', 'Last Name', 'Total Hours', 'Adjusted Additional Hours', 'Final Adjusted Total Hours'];
     const data = processedData.map(row => [
       row['First Name'],
       row['Last Name'],
       row['Total Hours'],
       row['Adjusted Additional Hours'],
-      row['Final Adjusted Total Hours']
+      { v: row['Final Adjusted Total Hours'], s: greenStyle }
     ]);
 
     // Create worksheet
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+    const ws = XLSX.utils.aoa_to_sheet([
+      headers.map((header, index) => 
+        index === 4 ? { v: header, s: greenStyle } : header
+      ),
+      ...data
+    ]);
 
     // Set column widths
-    const colWidths = [15, 15, 12, 20, 22];
-    ws['!cols'] = colWidths.map(width => ({ width }));
-
-    // Apply green fill to the "Final Adjusted Total Hours" column
-    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:E1');
-    for (let R = range.s.r + 1; R <= range.e.r; ++R) {
-      const cellRef = XLSX.utils.encode_cell({ r: R, c: 4 }); // Column E (index 4)
-      const cell = ws[cellRef];
-      if (cell) {
-        cell.s = {
-          fill: {
-            patternType: 'solid',
-            fgColor: { rgb: '92D050' }, // Excel's standard light green
-            bgColor: { rgb: '92D050' }
-          }
-        };
-      }
-    }
+    ws['!cols'] = [
+      { width: 15 }, // First Name
+      { width: 15 }, // Last Name
+      { width: 12 }, // Total Hours
+      { width: 20 }, // Adjusted Additional Hours
+      { width: 22 }  // Final Adjusted Total Hours
+    ];
 
     // Add the worksheet to workbook
     XLSX.utils.book_append_sheet(wb, ws, 'Processed Timesheet');
@@ -70,8 +72,7 @@ export const onRequestPost = async (context: { request: Request }) => {
     const wbout = XLSX.write(wb, {
       bookType: 'xlsx' as const,
       type: 'array' as const,
-      cellStyles: true,
-      compression: true
+      cellStyles: true
     });
 
     return new Response(wbout, {
