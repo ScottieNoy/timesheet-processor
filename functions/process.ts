@@ -27,47 +27,39 @@ export const onRequestPost = async (context: { request: Request }) => {
     // Process the data
     const processedData = processTimesheet(timesheet);
 
-    // Create a new workbook
-    const newWorkbook = XLSX.utils.book_new();
-    const headers = ['First Name', 'Last Name', 'Total Hours', 'Adjusted Additional Hours', 'Final Adjusted Total Hours'];
+    // Create a new workbook with styling
+    const wb = XLSX.utils.book_new();
     
-    // Convert processed data to array format for better control over formatting
-    const rows = processedData.map(row => [
+    // Convert data to array format
+    const headers = ['First Name', 'Last Name', 'Total Hours', 'Adjusted Additional Hours', 'Final Adjusted Total Hours'];
+    const data = processedData.map(row => [
       row['First Name'],
       row['Last Name'],
       row['Total Hours'],
       row['Adjusted Additional Hours'],
-      row['Final Adjusted Total Hours']
+      { v: row['Final Adjusted Total Hours'], s: { fill: { fgColor: { rgb: "90EE90" }, patternType: "solid" } } }
     ]);
 
-    // Create worksheet with data
-    const newWorksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    // Create worksheet
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
 
-    // Apply green fill to the "Final Adjusted Total Hours" column
-    const range = XLSX.utils.decode_range(newWorksheet['!ref'] || 'A1:E1');
-    for (let R = range.s.r + 1; R <= range.e.r; ++R) {
-      const cell_ref = XLSX.utils.encode_cell({ r: R, c: 4 }); // Column E (index 4)
-      if (!newWorksheet[cell_ref]) continue;
-      
-      newWorksheet[cell_ref].s = {
-        fill: {
-          patternType: 'solid',
-          fgColor: { rgb: "00FF00" }
-        }
-      };
-    }
+    // Set column widths
+    const colWidths = [15, 15, 12, 20, 22];
+    ws['!cols'] = colWidths.map(width => ({ width }));
 
-    // Add the worksheet to the workbook
-    XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, 'Processed Timesheet');
+    // Add the worksheet to workbook
+    XLSX.utils.book_append_sheet(wb, ws, 'Processed Timesheet');
 
-    // Generate buffer
-    const newBuffer = XLSX.write(newWorkbook, { 
-      type: 'array',
+    // Write to buffer with styles enabled
+    const opts = {
       bookType: 'xlsx',
+      bookSST: false,
+      type: 'array',
       cellStyles: true
-    });
+    };
+    const wbout = XLSX.write(wb, opts);
 
-    return new Response(newBuffer, {
+    return new Response(wbout, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': 'attachment; filename=processed_timesheet.xlsx'
