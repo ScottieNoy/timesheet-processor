@@ -13,6 +13,7 @@ export default function UserManagement({ user, onLogout }: UserManagementProps) 
   const [showAddUserForm, setShowAddUserForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Update user form state
   const [newUsername, setNewUsername] = useState('');
@@ -28,6 +29,7 @@ export default function UserManagement({ user, onLogout }: UserManagementProps) 
     e.preventDefault();
     setError(null);
     setSuccess(null);
+    setIsLoading(true);
 
     try {
       const response = await fetch('/auth', {
@@ -35,10 +37,9 @@ export default function UserManagement({ user, onLogout }: UserManagementProps) 
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           action: 'updateUser',
-          username: user.username,
-          password: currentPassword,
           newUsername: newUsername || undefined,
           newPassword: newPassword || undefined,
         }),
@@ -49,14 +50,14 @@ export default function UserManagement({ user, onLogout }: UserManagementProps) 
       if (response.ok) {
         setSuccess('Profile updated successfully');
         setShowUpdateForm(false);
-        // Update local storage with new user data
-        localStorage.setItem('user', JSON.stringify(data.user));
-        window.location.reload(); // Refresh to update UI
+        window.location.reload(); // Refresh to update UI with new user data
       } else {
         setError(data.error || 'Failed to update profile');
       }
     } catch (error) {
       setError('An error occurred while updating profile');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -64,6 +65,7 @@ export default function UserManagement({ user, onLogout }: UserManagementProps) 
     e.preventDefault();
     setError(null);
     setSuccess(null);
+    setIsLoading(true);
 
     try {
       const response = await fetch('/auth', {
@@ -71,6 +73,7 @@ export default function UserManagement({ user, onLogout }: UserManagementProps) 
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           action: 'addUser',
           username: addUsername,
@@ -92,13 +95,9 @@ export default function UserManagement({ user, onLogout }: UserManagementProps) 
       }
     } catch (error) {
       setError('An error occurred while adding user');
+    } finally {
+      setIsLoading(false);
     }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('isAuthenticated');
-    localStorage.removeItem('user');
-    onLogout();
   };
 
   return (
@@ -109,19 +108,24 @@ export default function UserManagement({ user, onLogout }: UserManagementProps) 
           <button
             onClick={() => setShowUpdateForm(!showUpdateForm)}
             className="text-blue-600 hover:text-blue-800"
+            disabled={isLoading}
           >
             Update Profile
           </button>
-          <button
-            onClick={() => setShowAddUserForm(!showAddUserForm)}
-            className="text-green-600 hover:text-green-800"
-          >
-            Add User
-          </button>
+          {user.isAdmin && (
+            <button
+              onClick={() => setShowAddUserForm(!showAddUserForm)}
+              className="text-green-600 hover:text-green-800"
+              disabled={isLoading}
+            >
+              Add User
+            </button>
+          )}
         </div>
         <button
-          onClick={handleLogout}
+          onClick={onLogout}
           className="text-red-600 hover:text-red-800"
+          disabled={isLoading}
         >
           Logout
         </button>
@@ -141,18 +145,6 @@ export default function UserManagement({ user, onLogout }: UserManagementProps) 
 
       {showUpdateForm && (
         <form onSubmit={handleUpdateUser} className="mt-4 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Current Password
-            </label>
-            <input
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            />
-          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">
               New Username (optional)
@@ -177,9 +169,12 @@ export default function UserManagement({ user, onLogout }: UserManagementProps) 
           </div>
           <button
             type="submit"
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            disabled={isLoading}
+            className={`bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 ${
+              isLoading ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
           >
-            Update Profile
+            {isLoading ? 'Updating...' : 'Update Profile'}
           </button>
         </form>
       )}
@@ -224,9 +219,12 @@ export default function UserManagement({ user, onLogout }: UserManagementProps) 
           </div>
           <button
             type="submit"
-            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+            disabled={isLoading}
+            className={`bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 ${
+              isLoading ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
           >
-            Add User
+            {isLoading ? 'Adding User...' : 'Add User'}
           </button>
         </form>
       )}
