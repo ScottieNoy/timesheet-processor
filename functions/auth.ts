@@ -16,6 +16,7 @@ interface AuthRequest {
   newUsername?: string;
   newPassword?: string;
   adminPassword?: string;
+  isFirstTimeSetup?: boolean;
 }
 
 export const onRequestPost = async (context: { request: Request; env: Env }) => {
@@ -49,6 +50,36 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
         break;
 
       case 'addUser':
+        // Special case for first-time setup
+        if (request.isFirstTimeSetup) {
+          if (users.length > 0) {
+            return new Response(JSON.stringify({ error: 'Setup already completed' }), {
+              status: 400,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+
+          if (!request.adminPassword || request.adminPassword !== adminPassword) {
+            return new Response(JSON.stringify({ error: 'Invalid setup password' }), {
+              status: 401,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+
+          users.push({
+            username: request.username!,
+            password: request.password!,
+            isAdmin: true,
+          });
+          
+          context.env.USERS = JSON.stringify(users);
+          
+          return new Response(JSON.stringify({ success: true }), {
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Normal user addition
         if (!request.adminPassword || request.adminPassword !== adminPassword) {
           return new Response(JSON.stringify({ error: 'Invalid admin password' }), {
             status: 401,
@@ -76,9 +107,6 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
           isAdmin: false,
         });
         
-        // In a real application, you'd want to store this in a database
-        // For this demo, we'll store it in the environment variable
-        // Note: This is just for demonstration and not recommended for production
         context.env.USERS = JSON.stringify(users);
         
         return new Response(JSON.stringify({ success: true }), {
