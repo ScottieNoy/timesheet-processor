@@ -1,4 +1,4 @@
-import { createSession, deleteSession, getUserFromSession } from './session';
+import { createSession, deleteSession, getUserFromSession, getSession } from './session';
 
 export interface Env {
   USERS?: string;
@@ -12,7 +12,7 @@ interface User {
 }
 
 interface AuthRequest {
-  action: 'login' | 'logout' | 'addUser' | 'updateUser';
+  action: 'login' | 'logout' | 'addUser' | 'updateUser' | 'verify';
   username?: string;
   password?: string;
   newUsername?: string;
@@ -29,7 +29,46 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
     let users: User[] = JSON.parse(usersStr);
     const adminPassword = context.env.ADMIN_PASSWORD || 'admin-password';
 
+    // Get session ID from cookie
+    const cookies = context.request.headers.get('Cookie') || '';
+    const sessionMatch = cookies.match(/sessionId=([^;]+)/);
+    const sessionId = sessionMatch ? sessionMatch[1] : undefined;
+
+    console.log('Action:', request.action);
+    console.log('Session ID:', sessionId);
+
     switch (request.action) {
+      case 'verify':
+        if (!sessionId) {
+          return new Response(JSON.stringify({ error: 'No session' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        const session = getSession(sessionId);
+        if (!session) {
+          return new Response(JSON.stringify({ error: 'Invalid session' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        const sessionUser = getUserFromSession(sessionId, users);
+        if (!sessionUser) {
+          return new Response(JSON.stringify({ error: 'User not found' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        return new Response(JSON.stringify({ 
+          success: true,
+          user: { ...sessionUser, password: undefined }
+        }), {
+          headers: { 'Content-Type': 'application/json' },
+        });
+
       case 'login':
         if (!request.username || !request.password) {
           return new Response(JSON.stringify({ error: 'Missing credentials' }), {
@@ -58,7 +97,11 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
             }
           );
         }
-        break;
+        
+        return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        });
 
       case 'addUser':
         // Special case for first-time setup
@@ -91,7 +134,7 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
         }
 
         // Check session for normal user addition
-        const adminUser = request.sessionId ? getUserFromSession(request.sessionId, users) : undefined;
+        const adminUser = sessionId ? getUserFromSession(sessionId, users) : undefined;
         if (!adminUser?.isAdmin) {
           return new Response(JSON.stringify({ error: 'Unauthorized' }), {
             status: 401,
@@ -126,7 +169,7 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
         });
 
       case 'updateUser':
-        const currentUser = request.sessionId ? getUserFromSession(request.sessionId, users) : undefined;
+        const currentUser = sessionId ? getUserFromSession(sessionId, users) : undefined;
         if (!currentUser) {
           return new Response(JSON.stringify({ error: 'Unauthorized' }), {
             status: 401,
@@ -169,8 +212,8 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
         );
 
       case 'logout':
-        if (request.sessionId) {
-          deleteSession(request.sessionId);
+        if (sessionId) {
+          deleteSession(sessionId);
         }
         return new Response(JSON.stringify({ success: true }), {
           headers: { 
@@ -180,11 +223,12 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
         });
     }
 
-    return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
-      status: 401,
+    return new Response(JSON.stringify({ error: 'Invalid action' }), {
+      status: 400,
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (error) {
+    console.error('Auth error:', error);
     return new Response(JSON.stringify({ error: 'Invalid request' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
