@@ -17,11 +17,12 @@ const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 export function createSession(userId: string): Session {
   // Clean up expired sessions
   const now = Date.now();
-  for (const [id, session] of SESSIONS.entries()) {
-    if (session.expiresAt < now) {
+  Array.from(SESSIONS.keys()).forEach(id => {
+    const session = SESSIONS.get(id);
+    if (session && session.expiresAt < now) {
       SESSIONS.delete(id);
     }
-  }
+  });
 
   const session: Session = {
     id: crypto.randomUUID(),
