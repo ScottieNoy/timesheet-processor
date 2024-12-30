@@ -1,13 +1,11 @@
-import { PagesFunction } from '@cloudflare/workers-types';
+import { RequestEvent } from '@cloudflare/workers-types';
 import * as XLSX from 'xlsx';
 
-interface Env {
-  // Add any environment variables here
-}
+interface Env {}
 
-export const onRequest: PagesFunction<Env> = async (context) => {
+export const onRequestPost = async ({ request }: RequestEvent<Env>) => {
   try {
-    const formData = await context.request.formData();
+    const formData = await request.formData();
     const file = formData.get('file') as File;
     
     if (!file) {
