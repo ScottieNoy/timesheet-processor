@@ -29,15 +29,43 @@ export const onRequestPost = async (context: { request: Request }) => {
 
     // Create a new workbook
     const newWorkbook = XLSX.utils.book_new();
-    const newWorksheet = XLSX.utils.json_to_sheet(processedData, {
-      header: ['First Name', 'Last Name', 'Total Hours', 'Adjusted Additional Hours', 'Final Adjusted Total Hours']
-    });
+    const headers = ['First Name', 'Last Name', 'Total Hours', 'Adjusted Additional Hours', 'Final Adjusted Total Hours'];
+    
+    // Convert processed data to array format for better control over formatting
+    const rows = processedData.map(row => [
+      row['First Name'],
+      row['Last Name'],
+      row['Total Hours'],
+      row['Adjusted Additional Hours'],
+      row['Final Adjusted Total Hours']
+    ]);
+
+    // Create worksheet with data
+    const newWorksheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+
+    // Apply green fill to the "Final Adjusted Total Hours" column
+    const range = XLSX.utils.decode_range(newWorksheet['!ref'] || 'A1:E1');
+    for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+      const cell_ref = XLSX.utils.encode_cell({ r: R, c: 4 }); // Column E (index 4)
+      if (!newWorksheet[cell_ref]) continue;
+      
+      newWorksheet[cell_ref].s = {
+        fill: {
+          patternType: 'solid',
+          fgColor: { rgb: "00FF00" }
+        }
+      };
+    }
 
     // Add the worksheet to the workbook
     XLSX.utils.book_append_sheet(newWorkbook, newWorksheet, 'Processed Timesheet');
 
     // Generate buffer
-    const newBuffer = XLSX.write(newWorkbook, { type: 'array', bookType: 'xlsx' });
+    const newBuffer = XLSX.write(newWorkbook, { 
+      type: 'array',
+      bookType: 'xlsx',
+      cellStyles: true
+    });
 
     return new Response(newBuffer, {
       headers: {

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 interface FileUploaderProps {
   isProcessing: boolean;
@@ -8,6 +8,7 @@ interface FileUploaderProps {
 
 export function FileUploader({ isProcessing, setIsProcessing, setError }: FileUploaderProps) {
   const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -48,8 +49,13 @@ export function FileUploader({ isProcessing, setIsProcessing, setError }: FileUp
       a.download = 'processed_timesheet.xlsx';
       document.body.appendChild(a);
       a.click();
+      
+      // Cleanup
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'An error occurred');
     } finally {
@@ -83,6 +89,7 @@ export function FileUploader({ isProcessing, setIsProcessing, setError }: FileUp
       onDrop={handleDrop}
     >
       <input
+        ref={fileInputRef}
         type="file"
         className="hidden"
         accept=".xlsx"
