@@ -51,13 +51,11 @@ export const onRequestPost = async (context: { request: Request }) => {
     XLSX.utils.book_append_sheet(wb, ws, 'Processed Timesheet');
 
     // Write to buffer with styles enabled
-    const opts = {
-      bookType: 'xlsx',
-      bookSST: false,
-      type: 'array',
+    const wbout = XLSX.write(wb, {
+      bookType: 'xlsx' as const,
+      type: 'array' as const,
       cellStyles: true
-    };
-    const wbout = XLSX.write(wb, opts);
+    });
 
     return new Response(wbout, {
       headers: {
