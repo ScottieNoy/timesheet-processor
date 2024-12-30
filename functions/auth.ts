@@ -1,5 +1,7 @@
+import { createSession, deleteSession, getUserFromSession } from './session';
+
 export interface Env {
-  USERS?: string; // JSON string of users
+  USERS?: string;
   ADMIN_PASSWORD?: string;
 }
 
@@ -17,6 +19,7 @@ interface AuthRequest {
   newPassword?: string;
   adminPassword?: string;
   isFirstTimeSetup?: boolean;
+  sessionId?: string;
 }
 
 export const onRequestPost = async (context: { request: Request; env: Env }) => {
@@ -26,11 +29,6 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
     let users: User[] = JSON.parse(usersStr);
     const adminPassword = context.env.ADMIN_PASSWORD || 'admin-password';
 
-    // Debug logging
-    console.log('Action:', request.action);
-    console.log('Is first time setup:', request.isFirstTimeSetup);
-    console.log('Admin password exists:', !!context.env.ADMIN_PASSWORD);
-    
     switch (request.action) {
       case 'login':
         if (!request.username || !request.password) {
@@ -45,10 +43,18 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
         );
 
         if (user) {
+          const session = createSession(user.username);
           return new Response(
-            JSON.stringify({ success: true, user: { ...user, password: undefined } }),
+            JSON.stringify({ 
+              success: true, 
+              user: { ...user, password: undefined },
+              sessionId: session.id
+            }),
             {
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 
+                'Content-Type': 'application/json',
+                'Set-Cookie': `sessionId=${session.id}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=86400`
+              },
             }
           );
         }
@@ -64,21 +70,8 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
             });
           }
 
-          // Debug logging
-          console.log('Setup password check:', {
-            provided: request.adminPassword,
-            expected: adminPassword,
-            matches: request.adminPassword === adminPassword
-          });
-
           if (!request.adminPassword || request.adminPassword !== adminPassword) {
-            return new Response(JSON.stringify({ 
-              error: 'Invalid setup password',
-              debug: {
-                hasAdminPassword: !!context.env.ADMIN_PASSWORD,
-                providedPassword: !!request.adminPassword
-              }
-            }), {
+            return new Response(JSON.stringify({ error: 'Invalid setup password' }), {
               status: 401,
               headers: { 'Content-Type': 'application/json' },
             });
@@ -97,9 +90,10 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
           });
         }
 
-        // Normal user addition
-        if (!request.adminPassword || request.adminPassword !== adminPassword) {
-          return new Response(JSON.stringify({ error: 'Invalid admin password' }), {
+        // Check session for normal user addition
+        const adminUser = request.sessionId ? getUserFromSession(request.sessionId, users) : undefined;
+        if (!adminUser?.isAdmin) {
+          return new Response(JSON.stringify({ error: 'Unauthorized' }), {
             status: 401,
             headers: { 'Content-Type': 'application/json' },
           });
@@ -132,20 +126,18 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
         });
 
       case 'updateUser':
-        if (!request.username || !request.password) {
-          return new Response(JSON.stringify({ error: 'Missing credentials' }), {
-            status: 400,
+        const currentUser = request.sessionId ? getUserFromSession(request.sessionId, users) : undefined;
+        if (!currentUser) {
+          return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
             headers: { 'Content-Type': 'application/json' },
           });
         }
 
-        const userIndex = users.findIndex(
-          (u) => u.username === request.username && u.password === request.password
-        );
-
+        const userIndex = users.findIndex(u => u.username === currentUser.username);
         if (userIndex === -1) {
-          return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
-            status: 401,
+          return new Response(JSON.stringify({ error: 'User not found' }), {
+            status: 404,
             headers: { 'Content-Type': 'application/json' },
           });
         }
@@ -177,8 +169,14 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
         );
 
       case 'logout':
+        if (request.sessionId) {
+          deleteSession(request.sessionId);
+        }
         return new Response(JSON.stringify({ success: true }), {
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Set-Cookie': 'sessionId=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0'
+          },
         });
     }
 

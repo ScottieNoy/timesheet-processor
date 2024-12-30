@@ -23,14 +23,12 @@ export default function LoginPage() {
           username,
           password,
         }),
+        credentials: 'include', // Important for handling cookies
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        // Store authentication status and user data in localStorage
-        localStorage.setItem('isAuthenticated', 'true');
-        localStorage.setItem('user', JSON.stringify(data.user));
         router.push('/'); // Redirect to home page
       } else {
         setError(data.error || 'Invalid credentials');
