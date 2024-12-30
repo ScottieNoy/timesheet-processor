@@ -1,12 +1,3 @@
- ⚠ Port 3000 is in use, trying 3001 instead.
- ⚠ Invalid next.config.js options detected: 
- ⚠     Unrecognized key(s) in object: 'api'
- ⚠ See more info here: https://nextjs.org/docs/messages/invalid-next-config
-npm notice
-npm notice New major version of npm available! 10.9.0 -> 11.0.0
-npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.0.0
-npm notice To update run: npm install -g npm@11.0.0
-npm notice
 'use client';
 
 import { useState } from 'react';
