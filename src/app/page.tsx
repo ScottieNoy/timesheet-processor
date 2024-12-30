@@ -1,19 +1,28 @@
-import { redirect } from 'next/navigation';
-import { getSession } from '@/lib/auth';
+'use client';
 
-export default async function HomePage() {
-  const session = await getSession();
+import { useState } from 'react';
+import { FileUploader } from '@/components/FileUploader';
 
-  if (!session) {
-    redirect('/login');
-  }
+export default function Home() {
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Welcome back, {session.user.username}!
-        </p>
+    <main className="min-h-screen p-8">
+      <div className="max-w-2xl mx-auto">
+        <h1 className="text-3xl font-bold mb-8 text-center">Timesheet Processor</h1>
+        <div className="bg-white p-6 rounded-lg shadow-lg">
+          <FileUploader
+            isProcessing={isProcessing}
+            setIsProcessing={setIsProcessing}
+            setError={setError}
+          />
+          {error && (
+            <div className="mt-4 p-4 bg-red-100 text-red-700 rounded">
+              {error}
+            </div>
+          )}
+        </div>
       </div>
     </main>
   );
