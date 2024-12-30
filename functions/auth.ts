@@ -1,21 +1,142 @@
 export interface Env {
-  APP_PASSWORD?: string;
+  USERS?: string; // JSON string of users
+  ADMIN_PASSWORD?: string;
 }
 
-export const onRequestPost = async (context: { request: Request, env: Env }) => {
-  try {
-    const { password } = await context.request.json();
-    
-    // Get the password from environment variable
-    const correctPassword = context.env.APP_PASSWORD || 'default-secure-password';
+interface User {
+  username: string;
+  password: string;
+  isAdmin?: boolean;
+}
 
-    if (password === correctPassword) {
-      return new Response(JSON.stringify({ success: true }), {
-        headers: { 'Content-Type': 'application/json' },
-      });
+interface AuthRequest {
+  action: 'login' | 'logout' | 'addUser' | 'updateUser';
+  username?: string;
+  password?: string;
+  newUsername?: string;
+  newPassword?: string;
+  adminPassword?: string;
+}
+
+export const onRequestPost = async (context: { request: Request; env: Env }) => {
+  try {
+    const request: AuthRequest = await context.request.json();
+    const usersStr = context.env.USERS || '[]';
+    let users: User[] = JSON.parse(usersStr);
+    const adminPassword = context.env.ADMIN_PASSWORD || 'admin-password';
+
+    switch (request.action) {
+      case 'login':
+        if (!request.username || !request.password) {
+          return new Response(JSON.stringify({ error: 'Missing credentials' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        const user = users.find(
+          (u) => u.username === request.username && u.password === request.password
+        );
+
+        if (user) {
+          return new Response(
+            JSON.stringify({ success: true, user: { ...user, password: undefined } }),
+            {
+              headers: { 'Content-Type': 'application/json' },
+            }
+          );
+        }
+        break;
+
+      case 'addUser':
+        if (!request.adminPassword || request.adminPassword !== adminPassword) {
+          return new Response(JSON.stringify({ error: 'Invalid admin password' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        if (!request.username || !request.password) {
+          return new Response(JSON.stringify({ error: 'Missing user details' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        if (users.some((u) => u.username === request.username)) {
+          return new Response(JSON.stringify({ error: 'Username already exists' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        users.push({
+          username: request.username,
+          password: request.password,
+          isAdmin: false,
+        });
+        
+        // In a real application, you'd want to store this in a database
+        // For this demo, we'll store it in the environment variable
+        // Note: This is just for demonstration and not recommended for production
+        context.env.USERS = JSON.stringify(users);
+        
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+      case 'updateUser':
+        if (!request.username || !request.password) {
+          return new Response(JSON.stringify({ error: 'Missing credentials' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        const userIndex = users.findIndex(
+          (u) => u.username === request.username && u.password === request.password
+        );
+
+        if (userIndex === -1) {
+          return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        if (request.newUsername) {
+          if (users.some((u, i) => i !== userIndex && u.username === request.newUsername)) {
+            return new Response(JSON.stringify({ error: 'Username already exists' }), {
+              status: 400,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+          users[userIndex].username = request.newUsername;
+        }
+
+        if (request.newPassword) {
+          users[userIndex].password = request.newPassword;
+        }
+
+        context.env.USERS = JSON.stringify(users);
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            user: { ...users[userIndex], password: undefined },
+          }),
+          {
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+
+      case 'logout':
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { 'Content-Type': 'application/json' },
+        });
     }
 
-    return new Response(JSON.stringify({ success: false }), {
+    return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' },
     });

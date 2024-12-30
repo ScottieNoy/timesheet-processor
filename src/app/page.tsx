@@ -1,17 +1,35 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import FileUploader from '@/components/FileUploader';
 import AuthCheck from '@/components/AuthCheck';
+import UserManagement from '@/components/UserManagement';
+import { User } from '@/types/auth';
 
 export default function Home() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      setUser(JSON.parse(userStr));
+    }
+  }, []);
+
+  const handleLogout = () => {
+    router.push('/login');
+  };
 
   return (
     <AuthCheck>
       <main className="min-h-screen p-8">
         <div className="max-w-2xl mx-auto space-y-8">
+          {user && <UserManagement user={user} onLogout={handleLogout} />}
+
           <div>
             <h1 className="text-3xl font-bold text-center mb-2">
               Timesheet Processor
