@@ -22,22 +22,34 @@ interface AuthRequest {
   sessionId?: string;
 }
 
-// Default admin credentials - you can change these to your preferred values
+// Default admin credentials
 const DEFAULT_ADMIN = {
   username: 'admin',
-  password: 'admin-password', // Change this to your preferred password
+  password: 'vytmyp-7wUqcy-tajqes',
   isAdmin: true,
 };
 
 export const onRequestPost = async (context: { request: Request; env: Env }) => {
   try {
     const request: AuthRequest = await context.request.json();
-    const usersStr = context.env.USERS || '[]';
-    let users: User[] = JSON.parse(usersStr);
+    console.log('Auth request:', { ...request, password: '[REDACTED]' });
+
+    // Initialize users array
+    let users: User[] = [];
+    try {
+      const usersStr = context.env.USERS || '[]';
+      console.log('Current users string:', usersStr);
+      users = JSON.parse(usersStr);
+      console.log('Parsed users:', users.map(u => ({ ...u, password: '[REDACTED]' })));
+    } catch (error) {
+      console.error('Error parsing users:', error);
+      users = [];
+    }
 
     // Always ensure default admin exists
     if (!users.some(u => u.username === DEFAULT_ADMIN.username)) {
-      users.push(DEFAULT_ADMIN);
+      console.log('Adding default admin user');
+      users = [...users, DEFAULT_ADMIN];
       context.env.USERS = JSON.stringify(users);
     }
 
@@ -45,57 +57,30 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
     const cookies = context.request.headers.get('Cookie') || '';
     const sessionMatch = cookies.match(/sessionId=([^;]+)/);
     const sessionId = sessionMatch ? sessionMatch[1] : undefined;
-
-    console.log('Action:', request.action);
-    console.log('Session ID:', sessionId);
+    console.log('Session ID from cookie:', sessionId);
 
     switch (request.action) {
-      case 'verify':
-        if (!sessionId) {
-          return new Response(JSON.stringify({ error: 'No session' }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json' },
-          });
-        }
-
-        const session = getSession(sessionId);
-        if (!session) {
-          return new Response(JSON.stringify({ error: 'Invalid session' }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json' },
-          });
-        }
-
-        const sessionUser = getUserFromSession(sessionId, users);
-        if (!sessionUser) {
-          return new Response(JSON.stringify({ error: 'User not found' }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json' },
-          });
-        }
-
-        return new Response(JSON.stringify({ 
-          success: true,
-          user: { ...sessionUser, password: undefined }
-        }), {
-          headers: { 'Content-Type': 'application/json' },
-        });
-
-      case 'login':
+      case 'login': {
+        console.log('Processing login request');
         if (!request.username || !request.password) {
+          console.log('Missing credentials');
           return new Response(JSON.stringify({ error: 'Missing credentials' }), {
             status: 400,
             headers: { 'Content-Type': 'application/json' },
           });
         }
 
+        console.log('Looking for user:', request.username);
         const user = users.find(
           (u) => u.username === request.username && u.password === request.password
         );
 
         if (user) {
+          console.log('User found, creating session');
           const session = createSession(user.username);
-          return new Response(
+          console.log('Session created:', session.id);
+          
+          const response = new Response(
             JSON.stringify({ 
               success: true, 
               user: { ...user, password: undefined },
@@ -104,21 +89,77 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
             {
               headers: { 
                 'Content-Type': 'application/json',
-                'Set-Cookie': `sessionId=${session.id}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=31536000` // 1 year
+                'Set-Cookie': `sessionId=${session.id}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=31536000`
               },
             }
           );
+          console.log('Login successful');
+          return response;
         }
         
+        console.log('Invalid credentials');
         return new Response(JSON.stringify({ error: 'Invalid credentials' }), {
           status: 401,
           headers: { 'Content-Type': 'application/json' },
         });
+      }
 
-      case 'addUser':
-        // Check session for user addition
+      case 'verify': {
+        console.log('Processing verify request');
+        if (!sessionId) {
+          console.log('No session ID provided');
+          return new Response(JSON.stringify({ error: 'No session' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        const session = getSession(sessionId);
+        if (!session) {
+          console.log('Invalid session');
+          return new Response(JSON.stringify({ error: 'Invalid session' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        const sessionUser = getUserFromSession(sessionId, users);
+        if (!sessionUser) {
+          console.log('User not found for session');
+          return new Response(JSON.stringify({ error: 'User not found' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        console.log('Session verified for user:', sessionUser.username);
+        return new Response(JSON.stringify({ 
+          success: true,
+          user: { ...sessionUser, password: undefined }
+        }), {
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      case 'logout': {
+        console.log('Processing logout request');
+        if (sessionId) {
+          deleteSession(sessionId);
+          console.log('Session deleted:', sessionId);
+        }
+        return new Response(JSON.stringify({ success: true }), {
+          headers: { 
+            'Content-Type': 'application/json',
+            'Set-Cookie': 'sessionId=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0'
+          },
+        });
+      }
+
+      case 'addUser': {
+        console.log('Processing add user request');
         const adminUser = sessionId ? getUserFromSession(sessionId, users) : undefined;
         if (!adminUser?.isAdmin) {
+          console.log('Unauthorized add user attempt');
           return new Response(JSON.stringify({ error: 'Unauthorized' }), {
             status: 401,
             headers: { 'Content-Type': 'application/json' },
@@ -126,6 +167,7 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
         }
 
         if (!request.username || !request.password) {
+          console.log('Missing user details');
           return new Response(JSON.stringify({ error: 'Missing user details' }), {
             status: 400,
             headers: { 'Content-Type': 'application/json' },
@@ -133,6 +175,7 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
         }
 
         if (users.some((u) => u.username === request.username)) {
+          console.log('Username already exists');
           return new Response(JSON.stringify({ error: 'Username already exists' }), {
             status: 400,
             headers: { 'Content-Type': 'application/json' },
@@ -146,22 +189,26 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
         });
         
         context.env.USERS = JSON.stringify(users);
+        console.log('User added successfully');
         
         return new Response(JSON.stringify({ success: true }), {
           headers: { 'Content-Type': 'application/json' },
         });
+      }
 
-      case 'updateUser':
+      case 'updateUser': {
+        console.log('Processing update user request');
         const currentUser = sessionId ? getUserFromSession(sessionId, users) : undefined;
         if (!currentUser) {
+          console.log('Unauthorized update attempt');
           return new Response(JSON.stringify({ error: 'Unauthorized' }), {
             status: 401,
             headers: { 'Content-Type': 'application/json' },
           });
         }
 
-        // Don't allow updating the default admin username
         if (currentUser.username === DEFAULT_ADMIN.username && request.newUsername) {
+          console.log('Attempt to change default admin username');
           return new Response(JSON.stringify({ error: 'Cannot change default admin username' }), {
             status: 400,
             headers: { 'Content-Type': 'application/json' },
@@ -170,6 +217,7 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
 
         const userIndex = users.findIndex(u => u.username === currentUser.username);
         if (userIndex === -1) {
+          console.log('User not found for update');
           return new Response(JSON.stringify({ error: 'User not found' }), {
             status: 404,
             headers: { 'Content-Type': 'application/json' },
@@ -178,6 +226,7 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
 
         if (request.newUsername) {
           if (users.some((u, i) => i !== userIndex && u.username === request.newUsername)) {
+            console.log('New username already exists');
             return new Response(JSON.stringify({ error: 'Username already exists' }), {
               status: 400,
               headers: { 'Content-Type': 'application/json' },
@@ -191,6 +240,7 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
         }
 
         context.env.USERS = JSON.stringify(users);
+        console.log('User updated successfully');
 
         return new Response(
           JSON.stringify({
@@ -201,19 +251,10 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
             headers: { 'Content-Type': 'application/json' },
           }
         );
-
-      case 'logout':
-        if (sessionId) {
-          deleteSession(sessionId);
-        }
-        return new Response(JSON.stringify({ success: true }), {
-          headers: { 
-            'Content-Type': 'application/json',
-            'Set-Cookie': 'sessionId=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0'
-          },
-        });
+      }
     }
 
+    console.log('Invalid action requested:', request.action);
     return new Response(JSON.stringify({ error: 'Invalid action' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
