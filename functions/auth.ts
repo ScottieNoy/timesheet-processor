@@ -22,12 +22,24 @@ interface AuthRequest {
   sessionId?: string;
 }
 
+// Default admin credentials - you can change these to your preferred values
+const DEFAULT_ADMIN = {
+  username: 'admin',
+  password: 'admin-password', // Change this to your preferred password
+  isAdmin: true,
+};
+
 export const onRequestPost = async (context: { request: Request; env: Env }) => {
   try {
     const request: AuthRequest = await context.request.json();
     const usersStr = context.env.USERS || '[]';
     let users: User[] = JSON.parse(usersStr);
-    const adminPassword = context.env.ADMIN_PASSWORD || 'admin-password';
+
+    // Always ensure default admin exists
+    if (!users.some(u => u.username === DEFAULT_ADMIN.username)) {
+      users.push(DEFAULT_ADMIN);
+      context.env.USERS = JSON.stringify(users);
+    }
 
     // Get session ID from cookie
     const cookies = context.request.headers.get('Cookie') || '';
@@ -92,7 +104,7 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
             {
               headers: { 
                 'Content-Type': 'application/json',
-                'Set-Cookie': `sessionId=${session.id}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=86400`
+                'Set-Cookie': `sessionId=${session.id}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=31536000` // 1 year
               },
             }
           );
@@ -104,36 +116,7 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
         });
 
       case 'addUser':
-        // Special case for first-time setup
-        if (request.isFirstTimeSetup) {
-          if (users.length > 0) {
-            return new Response(JSON.stringify({ error: 'Setup already completed' }), {
-              status: 400,
-              headers: { 'Content-Type': 'application/json' },
-            });
-          }
-
-          if (!request.adminPassword || request.adminPassword !== adminPassword) {
-            return new Response(JSON.stringify({ error: 'Invalid setup password' }), {
-              status: 401,
-              headers: { 'Content-Type': 'application/json' },
-            });
-          }
-
-          users.push({
-            username: request.username!,
-            password: request.password!,
-            isAdmin: true,
-          });
-          
-          context.env.USERS = JSON.stringify(users);
-          
-          return new Response(JSON.stringify({ success: true }), {
-            headers: { 'Content-Type': 'application/json' },
-          });
-        }
-
-        // Check session for normal user addition
+        // Check session for user addition
         const adminUser = sessionId ? getUserFromSession(sessionId, users) : undefined;
         if (!adminUser?.isAdmin) {
           return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -173,6 +156,14 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
         if (!currentUser) {
           return new Response(JSON.stringify({ error: 'Unauthorized' }), {
             status: 401,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Don't allow updating the default admin username
+        if (currentUser.username === DEFAULT_ADMIN.username && request.newUsername) {
+          return new Response(JSON.stringify({ error: 'Cannot change default admin username' }), {
+            status: 400,
             headers: { 'Content-Type': 'application/json' },
           });
         }
