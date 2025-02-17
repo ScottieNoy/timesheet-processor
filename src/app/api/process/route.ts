@@ -28,26 +28,32 @@ export async function POST(request: NextRequest) {
 
     // Add headers
     newWorksheet.columns = [
-      { header: 'First Name', key: 'firstName', width: 15 },
-      { header: 'Last Name', key: 'lastName', width: 15 },
-      { header: 'Total Hours', key: 'totalHours', width: 15 },
-      { header: 'Adjusted Additional Hours', key: 'adjustedAdditionalHours', width: 20 },
-      { header: 'Final Adjusted Total Hours', key: 'finalAdjustedTotalHours', width: 20 }
+      { header: 'Fornavn', key: 'firstName', width: 15 },
+      { header: 'Efternavn', key: 'lastName', width: 15 },
+      { header: 'Arbejds Timer', key: 'totalHours', width: 15 },
+      { header: 'Sygdom Timer', key: 'sickHours', width: 15 },
+      { header: 'Ferie Timer', key: 'vacationHours', width: 15 },
+      { header: 'Feriefridage Timer', key: 'vacationDaysHours', width: 15 },
+      { header: 'Tilføjede timer (Pause)', key: 'adjustedAdditionalHours', width: 15 },
+      { header: 'Total Justerede Timer', key: 'finalAdjustedTotalHours', width: 15 }
     ];
 
     // Add data
     processedData.forEach(row => {
       const newRow = newWorksheet.addRow({
-        firstName: row['First Name'],
-        lastName: row['Last Name'],
-        totalHours: row['Total Hours'],
-        adjustedAdditionalHours: row['Adjusted Additional Hours'],
-        finalAdjustedTotalHours: row['Final Adjusted Total Hours']
+        firstName: row['Fornavn'],
+        lastName: row['Efternavn'],
+        totalHours: row['Arbejds Timer'],
+        sickHours: row['Sygdom Timer'],
+        vacationHours: row['Ferie Timer'],
+        vacationDaysHours: row['Feriefridage Timer'],
+        adjustedAdditionalHours: row['Tilføjede timer (Pause)'],
+        finalAdjustedTotalHours: row['Total Justerede Timer']
       });
 
       // Apply green fill to Final Adjusted Total Hours column
-      const finalCell = newRow.getCell(5);
-      finalCell.fill = {
+      const finalAdjustedTotalHoursCell = newRow.getCell('finalAdjustedTotalHours');
+      finalAdjustedTotalHoursCell.fill = {
         type: 'pattern',
         pattern: 'solid',
         fgColor: { argb: 'FF00FF00' }
