@@ -1,18 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
-import ExcelJS from 'exceljs';
 
-export async function POST(request: NextRequest) {
+export interface Env {
+  // Add your environment variables here
+}
+
+export const onRequestPost = async (context: { request: Request }) => {
   try {
-    const formData = await request.formData();
+    const formData = await context.request.formData();
     const file = formData.get('file') as File;
     
     if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+      return new Response(JSON.stringify({ error: 'No file provided' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
-    // Convert File to Buffer
-    const buffer = Buffer.from(await file.arrayBuffer());
+    // Convert File to ArrayBuffer
+    const buffer = await file.arrayBuffer();
     
     // Read the Excel file
     const workbook = XLSX.read(buffer);
@@ -22,48 +27,61 @@ export async function POST(request: NextRequest) {
     // Process the data
     const processedData = processTimesheet(timesheet);
 
-    // Create a new workbook with formatting
-    const newWorkbook = new ExcelJS.Workbook();
-    const newWorksheet = newWorkbook.addWorksheet('Processed Timesheet');
+    // Create a new workbook
+    const wb = XLSX.utils.book_new();
+    
+    // Prepare the data with styling
+    const greenStyle = {
+      fill: {
+        patternType: 'solid',
+        fgColor: { rgb: '92D050' }
+      }
+    };
 
-    // Add headers
-    newWorksheet.columns = [
-      { header: 'Fornavn', key: 'firstName', width: 15 },
-      { header: 'Efternavn', key: 'lastName', width: 15 },
-      { header: 'Arbejds Timer', key: 'totalHours', width: 15 },
-      { header: 'Sygdom Timer', key: 'sickHours', width: 15 },
-      { header: 'Ferie Timer', key: 'vacationHours', width: 15 },
-      { header: 'Feriefridage Timer', key: 'vacationDaysHours', width: 15 },
-      { header: 'Tilføjede timer (Pause)', key: 'adjustedAdditionalHours', width: 15 },
-      { header: 'Total Justerede Timer', key: 'finalAdjustedTotalHours', width: 15 }
+    // Convert data to array format with styled cells
+    const headers = ['Fornavn', 'Efternavn', 'Arbejds Timer', 'Sygdom Timer', 'Ferie Timer', 'Feriefridage Timer', 'Tilføjede timer (Pause)', 'Total Justerede Timer'];
+    const data = processedData.map(row => [
+      { v: row['Fornavn'] },
+      { v: row['Efternavn'] },
+      { v: row['Arbejds Timer'] },
+      { v: row['Sygdom Timer'] },
+      { v: row['Ferie Timer'] },
+      { v: row['Feriefridage Timer'] },
+      { v: row['Tilføjede timer (Pause)'] },
+      { v: row['Total Justerede Timer'], s: greenStyle }
+    ]);
+
+    // Create worksheet
+    const ws = XLSX.utils.aoa_to_sheet([
+      headers.map((header, index) => 
+        index === 4 ? { v: header, s: greenStyle } : header
+      ),
+      ...data
+    ]);
+
+    // Set column widths
+    ws['!cols'] = [
+      { wch: 15 }, // Fornavn
+      { wch: 15 }, // Efternavn
+      { wch: 15 }, // Arbejds Timer
+      { wch: 15 }, // Sygdom Timer
+      { wch: 15 }, // Ferie Timer
+      { wch: 15 }, // Feriefridage Timer
+      { wch: 15 }, // Tilføjede timer (Pause)
+      { wch: 15 }  // Total Justerede Timer
     ];
 
-    // Add data
-    processedData.forEach(row => {
-      const newRow = newWorksheet.addRow({
-        firstName: row['Fornavn'],
-        lastName: row['Efternavn'],
-        totalHours: row['Arbejds Timer'],
-        sickHours: row['Sygdom Timer'],
-        vacationHours: row['Ferie Timer'],
-        vacationDaysHours: row['Feriefridage Timer'],
-        adjustedAdditionalHours: row['Tilføjede timer (Pause)'],
-        finalAdjustedTotalHours: row['Total Justerede Timer']
-      });
+    // Add the worksheet to workbook
+    XLSX.utils.book_append_sheet(wb, ws, 'Processed Timesheet');
 
-      // Apply green fill to Final Adjusted Total Hours column
-      const finalAdjustedTotalHoursCell = newRow.getCell(8); // Column index (1-based)
-      finalAdjustedTotalHoursCell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF00FF00' }
-      };
+    // Write to buffer with styles enabled
+    const wbout = XLSX.write(wb, {
+      bookType: 'xlsx' as const,
+      type: 'array' as const,
+      cellStyles: true
     });
 
-    // Generate buffer
-    const newBuffer = await newWorkbook.xlsx.writeBuffer();
-
-    return new NextResponse(newBuffer, {
+    return new Response(wbout, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': 'attachment; filename=processed_timesheet.xlsx'
@@ -71,9 +89,12 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error processing file:', error);
-    return NextResponse.json(
-      { error: 'Error processing file' },
-      { status: 500 }
+    return new Response(
+      JSON.stringify({ error: 'Error processing file' }),
+      { 
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      }
     );
   }
 }
