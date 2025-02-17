@@ -28,36 +28,30 @@ export async function POST(request: NextRequest) {
 
     // Add headers
     newWorksheet.columns = [
-      { header: 'Fornavn', key: 'firstName', width: 15 },
-      { header: 'Efternavn', key: 'lastName', width: 15 },
-      { header: 'Arbejds Timer', key: 'totalHours', width: 15 },
-      { header: 'Sygdom Timer', key: 'sickHours', width: 15 },
-      { header: 'Ferie Timer', key: 'vacationHours', width: 15 },
-      { header: 'Feriefridage Timer', key: 'vacationDaysHours', width: 15 },
-      { header: 'Tilføjede timer (Pause)', key: 'adjustedAdditionalHours', width: 15 },
-      { header: 'Total Justerede Timer', key: 'finalAdjustedTotalHours', width: 15 }
+      { header: 'Fornavn', key: 'Fornavn', width: 15 },
+      { header: 'Efternavn', key: 'Efternavn', width: 15 },
+      { header: 'Arbejds Timer', key: 'Arbejds Timer', width: 15 },
+      { header: 'Sygdom Timer', key: 'Sygdom Timer', width: 15 },
+      { header: 'Ferie Timer', key: 'Ferie Timer', width: 15 },
+      { header: 'Feriefridage Timer', key: 'Feriefridage Timer', width: 15 },
+      { header: 'Tilføjede timer (Pause)', key: 'Tilføjede timer (Pause)', width: 15 },
+      { header: 'Total Justerede Timer', key: 'Total Justerede Timer', width: 15 }
     ];
 
     // Add data
     processedData.forEach(row => {
-      const newRow = newWorksheet.addRow({
-        firstName: row['Fornavn'],
-        lastName: row['Efternavn'],
-        totalHours: row['Arbejds Timer'],
-        sickHours: row['Sygdom Timer'],
-        vacationHours: row['Ferie Timer'],
-        vacationDaysHours: row['Feriefridage Timer'],
-        adjustedAdditionalHours: row['Tilføjede timer (Pause)'],
-        finalAdjustedTotalHours: row['Total Justerede Timer']
-      });
+      newWorksheet.addRow(row);
+    });
 
-      // Apply green fill to Final Adjusted Total Hours column
-      const finalAdjustedTotalHoursCell = newRow.getCell(8); // Column index (1-based)
-      finalAdjustedTotalHoursCell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF00FF00' }
-      };
+    // Apply green fill to Final Adjusted Total Hours column
+    newWorksheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 1) {
+        row.getCell(8).fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FF00FF00' }
+        };
+      }
     });
 
     // Generate buffer
@@ -83,11 +77,11 @@ function processTimesheet(timesheet: any[]) {
   let data = timesheet.map(row => ({
     'First Name': row['First Name'],
     'Last Name': row['Last Name'],
-    'Total Hours': typeof row['Total Hours'] === 'string' ? parseFloat(row['Total Hours']) : row['Total Hours'],
-    'Base Hours': typeof row['Base Hours'] === 'string' ? parseFloat(row['Base Hours']) : row['Base Hours'],
-    'FerieTime': typeof row['FerieTime'] === 'string' ? parseFloat(row['FerieTime']) : row['FerieTime'],
-    'FeriefridageTime': typeof row['FeriefridageTime'] === 'string' ? parseFloat(row['FeriefridageTime']) : row['FeriefridageTime'],
-    'SygdomTime': typeof row['SygdomTime'] === 'string' ? parseFloat(row['SygdomTime']) : row['SygdomTime']
+    'Total Hours': parseFloat(row['Total Hours']) || 0,
+    'Base Hours': parseFloat(row['Base Hours']) || 0,
+    'FerieTime': parseFloat(row['FerieTime']) || 0,
+    'FeriefridageTime': parseFloat(row['FeriefridageTime']) || 0,
+    'SygdomTime': parseFloat(row['SygdomTime']) || 0
   }));
 
   // Forward fill employee names
@@ -109,53 +103,28 @@ function processTimesheet(timesheet: any[]) {
     const key = `${row['First Name']}-${row['Last Name']}`;
     if (!employeeData[key]) {
       employeeData[key] = {
-        additionalHours: 0,
-        sickHours: 0,
-        vacationHours: 0,
-        vacationDaysHours: 0,
+        'Tilføjede timer (Pause)': 0,
+        'Sygdom Timer': 0,
+        'Ferie Timer': 0,
+        'Feriefridage Timer': 0,
       };
     }
-    if (row['Base Hours'] && row['Base Hours'] > 1) {
-      employeeData[key].additionalHours += 0.25;
+    if (row['Base Hours'] > 1) {
+      employeeData[key]['Tilføjede timer (Pause)'] += 0.25;
     }
-    if (row['SygdomTime'] && row['SygdomTime'] > 1) {
-      employeeData[key].sickHours += row['SygdomTime'];
-    }
-    if (row['FerieTime'] && row['FerieTime'] > 1) {
-      employeeData[key].vacationHours += row['FerieTime'];
-    }
-    if (row['FeriefridageTime'] && row['FeriefridageTime'] > 1) {
-      employeeData[key].vacationDaysHours += row['FeriefridageTime'];
-    }
+    employeeData[key]['Sygdom Timer'] += row['SygdomTime'];
+    employeeData[key]['Ferie Timer'] += row['FerieTime'];
+    employeeData[key]['Feriefridage Timer'] += row['FeriefridageTime'];
   });
 
-
-  // Create final summary
-  const processedData = data
-    .filter(row => (row['Total Hours'] !== undefined && !isNaN(row['Total Hours'])) || row['SygdomTime'] > 0 || row['FerieTime'] > 0 || row['FeriefridageTime'] > 0)
-    .map(row => {
-      const key = `${row['First Name']}-${row['Last Name']}`;
-      const additionalHours = employeeData[key].additionalHours || 0;
-      const sickHours = employeeData[key].sickHours || 0;
-      const vacationHours = employeeData[key].vacationHours || 0;
-      const vacationDaysHours = employeeData[key].vacationDaysHours || 0;
-      const totalHours = row['Total Hours'] ? parseFloat(row['Total Hours']) : 0;
-      return {
-        // 'First Name': row['First Name'],
-        // 'Last Name': row['Last Name'],
-        // 'Total Hours': totalHours,
-        // 'Adjusted Additional Hours': additionalHours,
-        // 'Final Adjusted Total Hours': totalHours + additionalHours
-        'Fornavn': row['First Name'],
-        'Efternavn': row['Last Name'],
-        'Arbejds Timer': totalHours,
-        'Sygdom Timer': sickHours,
-        'Ferie Timer': vacationHours,
-        'Feriefridage Timer': vacationDaysHours,
-        'Tilføjede timer (Pause)': additionalHours,
-        'Total Justerede Timer': totalHours + additionalHours
-      };
-    });
-
-  return processedData;
+  return data.map(row => {
+    const key = `${row['First Name']}-${row['Last Name']}`;
+    return {
+      'Fornavn': row['First Name'],
+      'Efternavn': row['Last Name'],
+      'Arbejds Timer': row['Total Hours'],
+      ...employeeData[key],
+      'Total Justerede Timer': row['Total Hours'] + employeeData[key]['Tilføjede timer (Pause)']
+    };
+  });
 }
