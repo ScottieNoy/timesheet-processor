@@ -103,52 +103,43 @@ function processTimesheet(timesheet: any[]) {
     };
   });
 
-  // Calculate additional hours
-  const employeeAdditionalHours: { [key: string]: number } = {};
+  const employeeData: { [key: string]: any } = {};
+
   data.forEach(row => {
     const key = `${row['First Name']}-${row['Last Name']}`;
+    if (!employeeData[key]) {
+      employeeData[key] = {
+        additionalHours: 0,
+        sickHours: 0,
+        vacationHours: 0,
+        vacationDaysHours: 0,
+      };
+    }
     if (row['Base Hours'] && row['Base Hours'] > 1) {
-      employeeAdditionalHours[key] = (employeeAdditionalHours[key] || 0) + 0.25;
+      employeeData[key].additionalHours += 0.25;
     }
-  });
-
-  // sum worker sick hours
-  const employeeSickHours: { [key: string]: number } = {};
-  data.forEach(row => {
-    const key = `${row['First Name']}-${row['Last Name']}`;
     if (row['SygdomTime'] && row['SygdomTime'] > 1) {
-      employeeSickHours[key] = (employeeSickHours[key] || 0) + row['SygdomTime'];
+      employeeData[key].sickHours += row['SygdomTime'];
     }
-  });
-
-  // sum worker vacation hours
-  const employeeVacationHours: { [key: string]: number } = {};
-  data.forEach(row => {
-    const key = `${row['First Name']}-${row['Last Name']}`;
     if (row['FerieTime'] && row['FerieTime'] > 1) {
-      employeeVacationHours[key] = (employeeVacationHours[key] || 0) + row['FerieTime'];
+      employeeData[key].vacationHours += row['FerieTime'];
+    }
+    if (row['FeriefridageTime'] && row['FeriefridageTime'] > 1) {
+      employeeData[key].vacationDaysHours += row['FeriefridageTime'];
     }
   });
 
-  // sum worker vacation days hours
-  const employeeVacationDaysHours: { [key: string]: number } = {};
-  data.forEach(row => {
-    const key = `${row['First Name']}-${row['Last Name']}`;
-    if (row['FeriefridageTime'] && row['FeriefridageTime'] > 1) {
-      employeeVacationDaysHours[key] = (employeeVacationDaysHours[key] || 0) + row['FeriefridageTime'];
-    }
-  });
 
   // Create final summary
   const processedData = data
     .filter(row => (row['Total Hours'] !== undefined && !isNaN(row['Total Hours'])) || row['SygdomTime'] > 0 || row['FerieTime'] > 0 || row['FeriefridageTime'] > 0)
     .map(row => {
       const key = `${row['First Name']}-${row['Last Name']}`;
-      const additionalHours = employeeAdditionalHours[key] || 0;
-      const sickHours = employeeSickHours[key] || 0;
-      const vacationHours = employeeVacationHours[key] || 0;
-      const vacationDaysHours = employeeVacationDaysHours[key] || 0;
-      const totalHours = parseFloat(row['Total Hours'].toString());
+      const additionalHours = employeeData[key].additionalHours || 0;
+      const sickHours = employeeData[key].sickHours || 0;
+      const vacationHours = employeeData[key].vacationHours || 0;
+      const vacationDaysHours = employeeData[key].vacationDaysHours || 0;
+      const totalHours = row['Total Hours'] ? parseFloat(row['Total Hours']) : 0;
       return {
         // 'First Name': row['First Name'],
         // 'Last Name': row['Last Name'],
