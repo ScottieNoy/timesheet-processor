@@ -100,15 +100,23 @@ export const onRequestPost = async (context: { request: Request }) => {
 }
 
 function processTimesheet(timesheet: any[]) {
-  let data = timesheet.map(row => ({
-    'First Name': row['First Name'],
-    'Last Name': row['Last Name'],
-    'Total Hours': typeof row['Total Hours'] === 'string' ? parseFloat(row['Total Hours']) : row['Total Hours'],
-    'Base Hours': typeof row['Base Hours'] === 'string' ? parseFloat(row['Base Hours']) : row['Base Hours'],
-    'FerieTime': typeof row['FerieTime'] === 'string' ? parseFloat(row['FerieTime']) : row['FerieTime'],
-    'FeriefridageTime': typeof row['FeriefridageTime'] === 'string' ? parseFloat(row['FeriefridageTime']) : row['FeriefridageTime'],
-    'SygdomTime': typeof row['SygdomTime'] === 'string' ? parseFloat(row['SygdomTime']) : row['SygdomTime']
-  }));
+  let currentFirstName = '';
+  let currentLastName = '';
+  
+  let data = timesheet.map(row => {
+    if (row['First Name']) currentFirstName = row['First Name'];
+    if (row['Last Name']) currentLastName = row['Last Name'];
+    
+    return {
+      'First Name': currentFirstName,
+      'Last Name': currentLastName,
+      'Total Hours': typeof row['Total Hours'] === 'string' ? parseFloat(row['Total Hours']) : row['Total Hours'],
+      'Base Hours': typeof row['Base Hours'] === 'string' ? parseFloat(row['Base Hours']) : row['Base Hours'],
+      'FerieTime': typeof row['FerieTime'] === 'string' ? parseFloat(row['FerieTime']) : row['FerieTime'],
+      'FeriefridageTime': typeof row['FeriefridageTime'] === 'string' ? parseFloat(row['FeriefridageTime']) : row['FeriefridageTime'],
+      'SygdomTime': typeof row['SygdomTime'] === 'string' ? parseFloat(row['SygdomTime']) : row['SygdomTime']
+    };
+  });
 
   let employeeData: { [key: string]: any } = {};
 
@@ -137,6 +145,6 @@ function processTimesheet(timesheet: any[]) {
   return Object.values(employeeData).map(emp => {
     emp['Total Justerede Timer'] = emp['Arbejds Timer'] + emp['Tilføjede timer (Pause)'];
     return emp;
-  });
+  }).filter(emp => emp['Fornavn'] && emp['Efternavn']);
 }
 
