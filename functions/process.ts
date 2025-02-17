@@ -100,7 +100,6 @@ export const onRequestPost = async (context: { request: Request }) => {
 }
 
 function processTimesheet(timesheet: any[]) {
-  // Convert array of objects to DataFrame-like structure
   let data = timesheet.map(row => ({
     'First Name': row['First Name'],
     'Last Name': row['Last Name'],
@@ -111,67 +110,33 @@ function processTimesheet(timesheet: any[]) {
     'SygdomTime': typeof row['SygdomTime'] === 'string' ? parseFloat(row['SygdomTime']) : row['SygdomTime']
   }));
 
-  // Forward fill employee names
-  let currentFirstName = '';
-  let currentLastName = '';
-  data = data.map(row => {
-    if (row['First Name']) currentFirstName = row['First Name'];
-    if (row['Last Name']) currentLastName = row['Last Name'];
-    return {
-      ...row,
-      'First Name': currentFirstName,
-      'Last Name': currentLastName
-    };
-  });
-
-  const employeeData: { [key: string]: any } = {};
+  let employeeData: { [key: string]: any } = {};
 
   data.forEach(row => {
     const key = `${row['First Name']}-${row['Last Name']}`;
     if (!employeeData[key]) {
       employeeData[key] = {
-        additionalHours: 0,
-        sickHours: 0,
-        vacationHours: 0,
-        vacationDaysHours: 0,
+        'Fornavn': row['First Name'],
+        'Efternavn': row['Last Name'],
+        'Arbejds Timer': 0,
+        'Sygdom Timer': 0,
+        'Ferie Timer': 0,
+        'Feriefridage Timer': 0,
+        'Tilføjede timer (Pause)': 0,
       };
     }
+    employeeData[key]['Arbejds Timer'] += row['Total Hours'] || 0;
+    employeeData[key]['Sygdom Timer'] += row['SygdomTime'] || 0;
+    employeeData[key]['Ferie Timer'] += row['FerieTime'] || 0;
+    employeeData[key]['Feriefridage Timer'] += row['FeriefridageTime'] || 0;
     if (row['Base Hours'] && row['Base Hours'] > 1) {
-      employeeData[key].additionalHours += 0.25;
-    }
-    if (row['SygdomTime'] && row['SygdomTime'] > 1) {
-      employeeData[key].sickHours += row['SygdomTime'];
-    }
-    if (row['FerieTime'] && row['FerieTime'] > 1) {
-      employeeData[key].vacationHours += row['FerieTime'];
-    }
-    if (row['FeriefridageTime'] && row['FeriefridageTime'] > 1) {
-      employeeData[key].vacationDaysHours += row['FeriefridageTime'];
+      employeeData[key]['Tilføjede timer (Pause)'] += 0.25;
     }
   });
 
-
-  // Create final summary
-  const processedData = data
-    .filter(row => (row['Total Hours'] !== undefined && !isNaN(row['Total Hours'])) || row['SygdomTime'] > 0 || row['FerieTime'] > 0 || row['FeriefridageTime'] > 0)
-    .map(row => {
-      const key = `${row['First Name']}-${row['Last Name']}`;
-      const additionalHours = employeeData[key].additionalHours || 0;
-      const sickHours = employeeData[key].sickHours || 0;
-      const vacationHours = employeeData[key].vacationHours || 0;
-      const vacationDaysHours = employeeData[key].vacationDaysHours || 0;
-      const totalHours = row['Total Hours'] ? parseFloat(row['Total Hours']) : 0;
-      return {
-        'Fornavn': row['First Name'],
-        'Efternavn': row['Last Name'],
-        'Arbejds Timer': totalHours,
-        'Sygdom Timer': sickHours,
-        'Ferie Timer': vacationHours,
-        'Feriefridage Timer': vacationDaysHours,
-        'Tilføjede timer (Pause)': additionalHours,
-        'Total Justerede Timer': totalHours + additionalHours
-      };
-    });
-
-  return processedData;
+  return Object.values(employeeData).map(emp => {
+    emp['Total Justerede Timer'] = emp['Arbejds Timer'] + emp['Tilføjede timer (Pause)'];
+    return emp;
+  });
 }
+
