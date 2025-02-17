@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       });
 
       // Apply green fill to Final Adjusted Total Hours column
-      const finalAdjustedTotalHoursCell = newRow.getCell('finalAdjustedTotalHours');
+      const finalAdjustedTotalHoursCell = newRow.getCell(8); // Column index (1-based)
       finalAdjustedTotalHoursCell.fill = {
         type: 'pattern',
         pattern: 'solid',
@@ -85,9 +85,9 @@ function processTimesheet(timesheet: any[]) {
     'Last Name': row['Last Name'],
     'Total Hours': typeof row['Total Hours'] === 'string' ? parseFloat(row['Total Hours']) : row['Total Hours'],
     'Base Hours': typeof row['Base Hours'] === 'string' ? parseFloat(row['Base Hours']) : row['Base Hours'],
-    'FerieTime': row['FerieTime'] === 'string' ? parseFloat(row['FerieTime']) : row['FerieTime'],
-    'FeriefridageTime': row['FeriefridageTime'] === 'string' ? parseFloat(row['FeriefridageTime']) : row['FeriefridageTime'],
-    'SygdomTime': row['SygdomTime'] === 'string' ? parseFloat(row['SygdomTime']) : row['SygdomTime']
+    'FerieTime': typeof row['FerieTime'] === 'string' ? parseFloat(row['FerieTime']) : row['FerieTime'],
+    'FeriefridageTime': typeof row['FeriefridageTime'] === 'string' ? parseFloat(row['FeriefridageTime']) : row['FeriefridageTime'],
+    'SygdomTime': typeof row['SygdomTime'] === 'string' ? parseFloat(row['SygdomTime']) : row['SygdomTime']
   }));
 
   // Forward fill employee names
@@ -141,7 +141,7 @@ function processTimesheet(timesheet: any[]) {
 
   // Create final summary
   const processedData = data
-    .filter(row => row['Total Hours'] !== undefined && !isNaN(row['Total Hours']))
+    .filter(row => (row['Total Hours'] !== undefined && !isNaN(row['Total Hours'])) || row['SygdomTime'] > 0 || row['FerieTime'] > 0 || row['FeriefridageTime'] > 0)
     .map(row => {
       const key = `${row['First Name']}-${row['Last Name']}`;
       const additionalHours = employeeAdditionalHours[key] || 0;
