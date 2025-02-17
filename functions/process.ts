@@ -49,48 +49,31 @@ export const onRequestPost = async (context: { request: Request }) => {
 };
 
 function processTimesheet(timesheet: any[]) {
-  let data = timesheet.map(row => ({
-    'First Name': row['First Name'] || '',
-    'Last Name': row['Last Name'] || '',
-    'Total Hours': parseFloat(row['Total Hours']) || 0,
-    'Base Hours': parseFloat(row['Base Hours']) || 0,
-    'FerieTime': parseFloat(row['FerieTime']) || 0,
-    'FeriefridageTime': parseFloat(row['FeriefridageTime']) || 0,
-    'SygdomTime': parseFloat(row['SygdomTime']) || 0
-  }));
-
-  let currentFirstName = '', currentLastName = '';
-  data = data.map(row => {
-    if (row['First Name']) currentFirstName = row['First Name'];
-    if (row['Last Name']) currentLastName = row['Last Name'];
-    return { ...row, 'First Name': currentFirstName, 'Last Name': currentLastName };
-  });
-
   const employeeData: { [key: string]: any } = {};
-  data.forEach(row => {
-    const key = `${row['First Name']}-${row['Last Name']}`;
+
+  timesheet.forEach(row => {
+    const key = `${row['First Name'] || ''}-${row['Last Name'] || ''}`;
     if (!employeeData[key]) {
       employeeData[key] = {
-        'Tilføjede timer (Pause)': 0,
+        'Fornavn': row['First Name'] || '',
+        'Efternavn': row['Last Name'] || '',
+        'Arbejds Timer': 0,
         'Sygdom Timer': 0,
         'Ferie Timer': 0,
-        'Feriefridage Timer': 0
+        'Feriefridage Timer': 0,
+        'Tilføjede timer (Pause)': 0,
+        'Total Justerede Timer': 0
       };
     }
-    if (row['Base Hours'] > 1) employeeData[key]['Tilføjede timer (Pause)'] += 0.25;
-    employeeData[key]['Sygdom Timer'] += row['SygdomTime'];
-    employeeData[key]['Ferie Timer'] += row['FerieTime'];
-    employeeData[key]['Feriefridage Timer'] += row['FeriefridageTime'];
+    employeeData[key]['Arbejds Timer'] += parseFloat(row['Total Hours']) || 0;
+    employeeData[key]['Sygdom Timer'] += parseFloat(row['SygdomTime']) || 0;
+    employeeData[key]['Ferie Timer'] += parseFloat(row['FerieTime']) || 0;
+    employeeData[key]['Feriefridage Timer'] += parseFloat(row['FeriefridageTime']) || 0;
+    if (parseFloat(row['Base Hours']) > 1) {
+      employeeData[key]['Tilføjede timer (Pause)'] += 0.25;
+    }
+    employeeData[key]['Total Justerede Timer'] = employeeData[key]['Arbejds Timer'] + employeeData[key]['Tilføjede timer (Pause)'];
   });
 
-  return data.map(row => {
-    const key = `${row['First Name']}-${row['Last Name']}`;
-    return {
-      'Fornavn': row['First Name'],
-      'Efternavn': row['Last Name'],
-      'Arbejds Timer': row['Total Hours'],
-      ...employeeData[key],
-      'Total Justerede Timer': row['Total Hours'] + employeeData[key]['Tilføjede timer (Pause)']
-    };
-  });
+  return Object.values(employeeData);
 }
