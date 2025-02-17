@@ -85,7 +85,9 @@ function processTimesheet(timesheet: any[]) {
     'Last Name': row['Last Name'],
     'Total Hours': typeof row['Total Hours'] === 'string' ? parseFloat(row['Total Hours']) : row['Total Hours'],
     'Base Hours': typeof row['Base Hours'] === 'string' ? parseFloat(row['Base Hours']) : row['Base Hours'],
-    'Date': row['Date']
+    'FerieTime': row['FerieTime'] === 'string' ? parseFloat(row['FerieTime']) : row['FerieTime'],
+    'FeriefridageTime': row['FeriefridageTime'] === 'string' ? parseFloat(row['FeriefridageTime']) : row['FeriefridageTime'],
+    'SygdomTime': row['SygdomTime'] === 'string' ? parseFloat(row['SygdomTime']) : row['SygdomTime']
   }));
 
   // Forward fill employee names
@@ -110,19 +112,57 @@ function processTimesheet(timesheet: any[]) {
     }
   });
 
+  // sum worker sick hours
+  const employeeSickHours: { [key: string]: number } = {};
+  data.forEach(row => {
+    const key = `${row['First Name']}-${row['Last Name']}`;
+    if (row['SygdomTime'] && row['SygdomTime'] > 1) {
+      employeeSickHours[key] = (employeeSickHours[key] || 0) + row['SygdomTime'];
+    }
+  });
+
+  // sum worker vacation hours
+  const employeeVacationHours: { [key: string]: number } = {};
+  data.forEach(row => {
+    const key = `${row['First Name']}-${row['Last Name']}`;
+    if (row['FerieTime'] && row['FerieTime'] > 1) {
+      employeeVacationHours[key] = (employeeVacationHours[key] || 0) + row['FerieTime'];
+    }
+  });
+
+  // sum worker vacation days hours
+  const employeeVacationDaysHours: { [key: string]: number } = {};
+  data.forEach(row => {
+    const key = `${row['First Name']}-${row['Last Name']}`;
+    if (row['FeriefridageTime'] && row['FeriefridageTime'] > 1) {
+      employeeVacationDaysHours[key] = (employeeVacationDaysHours[key] || 0) + row['FeriefridageTime'];
+    }
+  });
+
   // Create final summary
   const processedData = data
     .filter(row => row['Total Hours'] !== undefined && !isNaN(row['Total Hours']))
     .map(row => {
       const key = `${row['First Name']}-${row['Last Name']}`;
       const additionalHours = employeeAdditionalHours[key] || 0;
+      const sickHours = employeeSickHours[key] || 0;
+      const vacationHours = employeeVacationHours[key] || 0;
+      const vacationDaysHours = employeeVacationDaysHours[key] || 0;
       const totalHours = parseFloat(row['Total Hours'].toString());
       return {
-        'First Name': row['First Name'],
-        'Last Name': row['Last Name'],
-        'Total Hours': totalHours,
-        'Adjusted Additional Hours': additionalHours,
-        'Final Adjusted Total Hours': totalHours + additionalHours
+        // 'First Name': row['First Name'],
+        // 'Last Name': row['Last Name'],
+        // 'Total Hours': totalHours,
+        // 'Adjusted Additional Hours': additionalHours,
+        // 'Final Adjusted Total Hours': totalHours + additionalHours
+        'Fornavn': row['First Name'],
+        'Efternavn': row['Last Name'],
+        'Arbejds Timer': totalHours,
+        'Sygdom Timer': sickHours,
+        'Ferie Timer': vacationHours,
+        'Feriefridage Timer': vacationDaysHours,
+        'Tilføjede timer (Pause)': additionalHours,
+        'Total Justerede Timer': totalHours + additionalHours
       };
     });
 
