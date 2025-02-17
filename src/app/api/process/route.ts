@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     const newWorkbook = new ExcelJS.Workbook();
     const newWorksheet = newWorkbook.addWorksheet('Processed Timesheet');
 
-    // Add headers
+    // Add headers with Danish column names
     newWorksheet.columns = [
       { header: 'Fornavn', key: 'Fornavn', width: 15 },
       { header: 'Efternavn', key: 'Efternavn', width: 15 },
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
       { header: 'Total Justerede Timer', key: 'Total Justerede Timer', width: 15 }
     ];
 
-    // Add data
+    // Add data using Danish keys
     processedData.forEach(row => {
       newWorksheet.addRow(row);
     });
@@ -73,7 +73,6 @@ export async function POST(request: NextRequest) {
 }
 
 function processTimesheet(timesheet: any[]) {
-  // Convert array of objects to DataFrame-like structure
   let data = timesheet.map(row => ({
     'First Name': row['First Name'],
     'Last Name': row['Last Name'],
@@ -84,7 +83,6 @@ function processTimesheet(timesheet: any[]) {
     'SygdomTime': parseFloat(row['SygdomTime']) || 0
   }));
 
-  // Forward fill employee names
   let currentFirstName = '';
   let currentLastName = '';
   data = data.map(row => {
