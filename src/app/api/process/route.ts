@@ -148,12 +148,12 @@ function processTimesheet(timesheet: any[]) {
         // 'Final Adjusted Total Hours': totalHours + additionalHours
         'Fornavn': row['First Name'],
         'Efternavn': row['Last Name'],
-        'Arbejds Timer': totalHours,
+        'Arbejds Timer': totalHours - sickHours - vacationDaysHours,
         'Sygdom Timer': sickHours,
         'Ferie Timer': vacationHours,
         'Feriefridage Timer': vacationDaysHours,
         'Tilføjede timer (Pause)': additionalHours,
-        'Total Justerede Timer': totalHours + additionalHours
+        'Total Justerede Timer': totalHours + additionalHours - sickHours - vacationDaysHours
       };
     });
 
